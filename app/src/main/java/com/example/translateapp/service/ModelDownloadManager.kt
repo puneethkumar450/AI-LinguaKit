@@ -105,13 +105,11 @@ class ModelDownloadManager {
         }
     }
 
-    // ── Translate (offline-first) ─────────────────────────────────────────────
+    // ── Translate (offline — model must be pre-downloaded) ────────────────────
 
     /**
      * Translates [text] using a model that **must already be downloaded**.
-     * Uses [com.google.mlkit.nl.translate.Translation] directly and does NOT
-     * attempt any network download — the caller is responsible for ensuring
-     * the model is present first.
+     * Does NOT attempt any network download — throws if model is absent.
      */
     suspend fun translateOffline(
         text: String,
@@ -123,11 +121,52 @@ class ModelDownloadManager {
             .setTargetLanguage(targetLang)
             .build()
         val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
-        // requireDownloadedModels = true → fails immediately if model missing
         translator.translate(text)
             .addOnSuccessListener { result ->
                 cont.resume(result)
                 translator.close()
+            }
+            .addOnFailureListener { e ->
+                cont.resumeWithException(e)
+                translator.close()
+            }
+    }
+
+    // ── Translate (online — no local model required) ──────────────────────────
+
+    /**
+     * Translates [text] using ML Kit's cloud path via [downloadModelIfNeeded].
+     *
+     * This does NOT download the full ~30 MB language pack — ML Kit fetches
+     * just enough data to produce the translation over the network.
+     * Use this when the pack is absent but the device is online.
+     *
+     * Requires internet. Throws if offline or the request fails.
+     */
+    suspend fun translateOnline(
+        text: String,
+        sourceLang: String,
+        targetLang: String
+    ): String = suspendCancellableCoroutine { cont ->
+        val options = com.google.mlkit.nl.translate.TranslatorOptions.Builder()
+            .setSourceLanguage(sourceLang)
+            .setTargetLanguage(targetLang)
+            .build()
+        val translator = com.google.mlkit.nl.translate.Translation.getClient(options)
+        // downloadModelIfNeeded with no conditions = uses network if needed,
+        // but does NOT persist the full model to disk.
+        val conditions = DownloadConditions.Builder().build()
+        translator.downloadModelIfNeeded(conditions)
+            .addOnSuccessListener {
+                translator.translate(text)
+                    .addOnSuccessListener { result ->
+                        cont.resume(result)
+                        translator.close()
+                    }
+                    .addOnFailureListener { e ->
+                        cont.resumeWithException(e)
+                        translator.close()
+                    }
             }
             .addOnFailureListener { e ->
                 cont.resumeWithException(e)

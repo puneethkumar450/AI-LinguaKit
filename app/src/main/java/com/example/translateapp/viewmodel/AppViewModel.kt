@@ -1,10 +1,7 @@
 package com.example.translateapp.viewmodel
 
 import android.app.Application
-import android.content.Context
 import android.graphics.Bitmap
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -14,6 +11,7 @@ import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.data.TranslationHistoryEntity
+import com.example.translateapp.service.ConnectivityHelper
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -115,8 +113,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _translateError     = MutableStateFlow<String?>(null)
     val translateError: StateFlow<String?> = _translateError.asStateFlow()
 
-    private val _wasOffline = MutableStateFlow(false)
-    val wasOffline: StateFlow<Boolean> = _wasOffline.asStateFlow()
+    /**
+     * How the last translation result was produced — drives UI badges.
+     *   NONE        = no result yet
+     *   OFFLINE     = used on-device model (no network needed)
+     *   ONLINE      = used network, no pack downloaded
+     *   HISTORY     = served from local history cache (device was offline)
+     */
+    enum class TranslateSource { NONE, OFFLINE, ONLINE, HISTORY }
+
+    private val _translateSource = MutableStateFlow(TranslateSource.NONE)
+    val translateSource: StateFlow<TranslateSource> = _translateSource.asStateFlow()
 
     // ── TTS feature ───────────────────────────────────────────────────────────
     private val _ttsInput    = MutableStateFlow("")
@@ -156,12 +163,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         packRepo.initAsync()
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) {
+                Log.d("AppViewModel", "TTS initialized successfully")
                 _ttsReady.value = true
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(id: String?) { _isSpeaking.value = true }
-                    override fun onDone(id: String?)  { _isSpeaking.value = false }
-                    override fun onError(id: String?) { _isSpeaking.value = false }
+                    override fun onStart(id: String?) { 
+                        Log.d("AppViewModel", "TTS started: $id")
+                        _isSpeaking.value = true 
+                    }
+                    override fun onDone(id: String?)  { 
+                        Log.d("AppViewModel", "TTS done: $id")
+                        _isSpeaking.value = false 
+                    }
+                    override fun onError(id: String?) { 
+                        Log.e("AppViewModel", "TTS error: $id")
+                        _isSpeaking.value = false 
+                    }
                 })
+            } else {
+                Log.e("AppViewModel", "TTS initialization failed with status: $status")
             }
         }
     }
@@ -172,19 +191,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translateInput.value = text
         _translatedText.value = ""
         _translateError.value = null
-        _wasOffline.value = false
+        _translateSource.value = TranslateSource.NONE
     }
 
     fun setTranslateSourceLang(lang: LanguageOption) {
         _translateSourceLang.value = lang
         _translatedText.value = ""
-        _wasOffline.value = false
+        _translateSource.value = TranslateSource.NONE
     }
 
     fun setTranslateTargetLang(lang: LanguageOption) {
         _translateTargetLang.value = lang
         _translatedText.value = ""
-        _wasOffline.value = false
+        _translateSource.value = TranslateSource.NONE
     }
 
     fun swapTranslateLanguages() {
@@ -200,13 +219,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun isOnline(): Boolean {
-        val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val net = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(net) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
     fun translate() {
         val text = _translateInput.value.trim()
         if (text.isBlank()) return
@@ -216,66 +228,58 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _translateLoading.value = true
             _translateError.value   = null
-            _wasOffline.value       = false
-            try {
-                val bothReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
+            _translateSource.value  = TranslateSource.NONE
 
-                if (bothReady) {
-                    val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
-                    _translatedText.value = result
-                    _wasOffline.value     = true
-                    saveHistory(text, result, src, tgt)
-                } else {
-                    // Not both ready. Check internet.
-                    if (isOnline()) {
-                        // Online mode - ML Kit's Translation.getClient() with downloaded models = false 
-                        // can handle online translation if we allow it, but ML Kit Translate is 
-                        // strictly on-device. If models aren't there, we MUST download.
-                        // However, ML Kit's Translator.downloadModelIfNeeded() is the standard way.
-                        // If user wants "Online Translate without full download", ML Kit doesn't 
-                        // support a "thin" online API for Translation. It's offline-first.
-                        
-                        // IF we want to strictly follow "dont download whole pack for one word", 
-                        // ML Kit might not be the right tool for that specific requirement 
-                        // as it requires the model.
-                        
-                        // BUT, if we interpret "online translate" as "download if needed" 
-                        // we can use downloader.translateOffline but let it download.
-                        // To satisfy "dont download whole pack for one word", we'd need a different API.
-                        
-                        // Assuming we stay with ML Kit: 
-                        // If offline: check history.
-                        if (!isOnline()) {
-                             val historyMatch = historyDao.findInHistory(text, src.code, tgt.code)
-                             if (historyMatch != null) {
-                                 _translatedText.value = historyMatch.translatedText
-                                 _wasOffline.value = true
-                                 _uiMessage.emit("Restored from history (Offline)")
-                             } else {
-                                 _translateError.value = "Cannot translate. Connect to internet or download the package to work offline."
-                             }
+            try {
+                val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
+                val isOnline   = ConnectivityHelper.isOnline(getApplication())
+
+                when {
+                    // ── 1. Both packs downloaded → pure offline ───────────────
+                    packsReady -> {
+                        val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
+                        _translatedText.value  = result
+                        _translateSource.value = TranslateSource.OFFLINE
+                        saveHistory(text, result, src, tgt)
+                    }
+
+                    // ── 2. Packs missing but online → lightweight cloud translate
+                    isOnline -> {
+                        val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
+                        _translatedText.value  = result
+                        _translateSource.value = TranslateSource.ONLINE
+                        saveHistory(text, result, src, tgt)
+                    }
+
+                    // ── 3. Offline + no pack → check history cache ────────────
+                    else -> {
+                        val cached = historyDao.findInHistory(text, src.code, tgt.code)
+                        if (cached != null) {
+                            _translatedText.value  = cached.translatedText
+                            _translateSource.value = TranslateSource.HISTORY
                         } else {
-                            // Online - we can download.
-                            _uiMessage.emit("Downloading language models…")
-                            downloadMissingPacks(src.mlKitCode, tgt.mlKitCode)
-                            val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
-                            _translatedText.value = result
-                            saveHistory(text, result, src, tgt)
-                        }
-                    } else {
-                        // Offline and packs not ready.
-                        val historyMatch = historyDao.findInHistory(text, src.code, tgt.code)
-                        if (historyMatch != null) {
-                            _translatedText.value = historyMatch.translatedText
-                            _wasOffline.value = true
-                            _uiMessage.emit("Restored from history (Offline)")
-                        } else {
-                            _translateError.value = "Cannot translate. Connect to internet or download the package to work offline."
+                            // Nothing we can do — tell the user clearly
+                            _translateError.value = buildOfflineError(src, tgt)
                         }
                     }
                 }
             } catch (e: Exception) {
-                _translateError.value = buildErrorMessage(e)
+                // If online translate threw a network error, still try history
+                val isNetworkError = isNetworkException(e)
+                if (isNetworkError) {
+                    val src2 = _translateSourceLang.value
+                    val tgt2 = _translateTargetLang.value
+                    val text2 = _translateInput.value.trim()
+                    val cached = historyDao.findInHistory(text2, src2.code, tgt2.code)
+                    if (cached != null) {
+                        _translatedText.value  = cached.translatedText
+                        _translateSource.value = TranslateSource.HISTORY
+                    } else {
+                        _translateError.value = buildOfflineError(src2, tgt2)
+                    }
+                } else {
+                    _translateError.value = "Translation failed: ${e.message}"
+                }
                 Log.e("AppViewModel", "translate error", e)
             } finally {
                 _translateLoading.value = false
@@ -283,22 +287,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun downloadMissingPacks(srcCode: String, tgtCode: String) {
-        val srcPack = packDao.getByCode(srcCode)
-        val tgtPack = packDao.getByCode(tgtCode)
-        if (srcPack?.status != PackStatus.DOWNLOADED) packRepo.downloadPack(srcCode, requireWifi = false)
-        if (tgtPack?.status != PackStatus.DOWNLOADED) packRepo.downloadPack(tgtCode, requireWifi = false)
+    private fun isNetworkException(e: Exception): Boolean {
+        val msg = e.message?.lowercase() ?: ""
+        return msg.contains("no internet") ||
+               msg.contains("network") ||
+               msg.contains("unable to resolve") ||
+               msg.contains("failed to connect") ||
+               msg.contains("timeout") ||
+               e is java.net.UnknownHostException ||
+               e is java.net.SocketTimeoutException ||
+               e is java.io.IOException
     }
 
-    private fun buildErrorMessage(e: Exception): String {
-        val msg = e.message?.lowercase() ?: ""
-        return when {
-            msg.contains("no internet") || msg.contains("network") || msg.contains("unable to resolve") ->
-                "No internet. Download language packs first in the Packs tab."
-            msg.contains("model") || msg.contains("download") ->
-                "Model unavailable. Go to Language Packs to download it."
-            else -> "Translation failed: ${e.message}"
-        }
+    private fun buildOfflineError(src: LanguageOption, tgt: LanguageOption): String {
+        return "You're offline and \"${src.displayName} → ${tgt.displayName}\" " +
+               "language pack isn't downloaded.\n\n" +
+               "• Connect to the internet to translate, or\n" +
+               "• Download the language pack in the Packs tab to work fully offline."
     }
 
     private suspend fun saveHistory(
@@ -358,17 +363,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setTtsLanguage(lang: LanguageOption) { _ttsLanguage.value = lang }
 
     fun speakText(text: String, langCode: String) {
+        Log.d("AppViewModel", "speakText: text='$text', langCode='$langCode', ttsReady=${_ttsReady.value}")
         if (!_ttsReady.value || text.isBlank()) return
+        
         val locale = Locale.forLanguageTag(langCode)
+        Log.d("AppViewModel", "Setting TTS language to $locale")
+        
         val result = tts?.setLanguage(locale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            tts?.setLanguage(Locale.ENGLISH)
+            Log.w("AppViewModel", "Language $langCode not supported or missing data, falling back to English")
+            tts?.language = Locale.ENGLISH
         }
+        
         tts?.stop()
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
+        val speechResult = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
+        Log.d("AppViewModel", "tts.speak result: $speechResult")
     }
 
-    fun stopSpeaking() { tts?.stop(); _isSpeaking.value = false }
+    fun stopSpeaking() { 
+        Log.d("AppViewModel", "stopSpeaking")
+        tts?.stop()
+        _isSpeaking.value = false 
+    }
 
     // ── OCR actions ───────────────────────────────────────────────────────────
 

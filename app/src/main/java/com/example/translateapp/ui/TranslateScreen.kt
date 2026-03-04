@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
+import com.example.translateapp.viewmodel.AppViewModel.TranslateSource
 import com.example.translateapp.viewmodel.LanguageOption
 
 @Composable
@@ -29,8 +30,9 @@ fun TranslateScreen(vm: AppViewModel) {
     val targetLang  by vm.translateTargetLang.collectAsState()
     val loading     by vm.translateLoading.collectAsState()
     val error       by vm.translateError.collectAsState()
-    val wasOffline  by vm.wasOffline.collectAsState()
     val clipboard   = LocalClipboardManager.current
+    val translateSource by vm.translateSource.collectAsState()
+    val isSpeaking by vm.isSpeaking.collectAsState()
 
     // Observe pack status for selected languages
     val srcPack by vm.observePackStatus(sourceLang.mlKitCode).collectAsState(initial = null)
@@ -110,15 +112,15 @@ fun TranslateScreen(vm: AppViewModel) {
                     strokeWidth = 2.dp
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(if (bothReady) "Translating…" else "Downloading models & translating…")
+                Text("Translating…")
             } else {
                 Icon(
-                    if (bothReady) Icons.Default.OfflinePin else Icons.Default.CloudDownload,
+                    if (bothReady) Icons.Default.OfflinePin else Icons.Default.Language,
                     contentDescription = null
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (bothReady) "Translate (offline)" else "Translate (download & save)",
+                    if (bothReady) "Translate (offline)" else "Translate",
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -163,43 +165,35 @@ fun TranslateScreen(vm: AppViewModel) {
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
-                            // Offline badge on result
-                            if (wasOffline) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = Color(0xFF16A34A).copy(alpha = 0.12f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.OfflinePin,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(10.dp),
-                                            tint = Color(0xFF16A34A)
-                                        )
-                                        Text(
-                                            "offline",
-                                            fontSize = 9.sp,
-                                            color = Color(0xFF16A34A),
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
+                            // Source badge — varies by how result was produced
+                            TranslateSourceBadge(translateSource)
                         }
-                        IconButton(
-                            onClick = { clipboard.setText(AnnotatedString(output)) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    if (isSpeaking) vm.stopSpeaking()
+                                    else vm.speakText(output, targetLang.code)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                    contentDescription = "Speak",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(
+                                onClick = { clipboard.setText(AnnotatedString(output)) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -216,7 +210,45 @@ fun TranslateScreen(vm: AppViewModel) {
     }
 }
 
-/** Banner shown below the top bar when one or both pack(s) are missing. */
+/** Small pill badge showing how the last translation was produced. */
+@Composable
+private fun TranslateSourceBadge(source: TranslateSource) {
+    if (source == TranslateSource.NONE) return
+    val (icon, label, bgColor, textColor) = when (source) {
+        TranslateSource.OFFLINE -> Quad(
+            Icons.Default.OfflinePin, "offline",
+            Color(0xFFDCFCE7), Color(0xFF15803D)
+        )
+        TranslateSource.ONLINE -> Quad(
+            Icons.Default.Language, "online",
+            Color(0xFFDBEAFE), Color(0xFF1D4ED8)
+        )
+        TranslateSource.HISTORY -> Quad(
+            Icons.Default.History, "from cache",
+            Color(0xFFFEF9C3), Color(0xFF854D0E)
+        )
+        else -> return
+    }
+    Surface(shape = RoundedCornerShape(4.dp), color = bgColor) {
+        Row(
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(icon, contentDescription = null,
+                modifier = Modifier.size(10.dp), tint = textColor)
+            Text(label, fontSize = 9.sp, color = textColor, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+private operator fun <A, B, C, D> Quad<A, B, C, D>.component1() = a
+private operator fun <A, B, C, D> Quad<A, B, C, D>.component2() = b
+private operator fun <A, B, C, D> Quad<A, B, C, D>.component3() = c
+private operator fun <A, B, C, D> Quad<A, B, C, D>.component4() = d
+
+/** Banner shown below the top bar to communicate translation mode. */
 @Composable
 private fun OfflineReadinessBanner(
     srcReady: Boolean,
@@ -226,7 +258,7 @@ private fun OfflineReadinessBanner(
 ) {
     val bothReady = srcReady && tgtReady
     if (bothReady) {
-        // Show a subtle "fully offline" confirmation
+        // Fully offline — best case
         Card(
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7)),
@@ -240,13 +272,14 @@ private fun OfflineReadinessBanner(
                 Icon(Icons.Default.OfflinePin, contentDescription = null,
                     tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
                 Text(
-                    "Both language models are on-device — translates without internet",
+                    "Language packs ready — works without internet",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF15803D)
                 )
             }
         }
     } else {
+        // Packs missing — online translate will be used, or history fallback if offline
         val missing = buildList {
             if (!srcReady) add(srcLang.displayName)
             if (!tgtReady) add(tgtLang.displayName)

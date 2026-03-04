@@ -12,8 +12,19 @@ interface TranslationHistoryDao {
     @Query("SELECT * FROM translation_history WHERE isFavorite = 1 ORDER BY timestampMs DESC")
     fun getFavorites(): Flow<List<TranslationHistoryEntity>>
 
-    @Query("SELECT * FROM translation_history WHERE sourceText = :text AND sourceLangCode = :srcCode AND targetLangCode = :tgtCode LIMIT 1")
-    suspend fun findInHistory(text: String, srcCode: String, tgtCode: String): TranslationHistoryEntity?
+    @Query("""
+        SELECT * FROM translation_history
+        WHERE LOWER(TRIM(sourceText)) = LOWER(TRIM(:sourceText))
+          AND sourceLangCode = :sourceLangCode
+          AND targetLangCode = :targetLangCode
+        ORDER BY timestampMs DESC
+        LIMIT 1
+    """)
+    suspend fun findInHistory(
+        sourceText: String,
+        sourceLangCode: String,
+        targetLangCode: String
+    ): TranslationHistoryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: TranslationHistoryEntity): Long
