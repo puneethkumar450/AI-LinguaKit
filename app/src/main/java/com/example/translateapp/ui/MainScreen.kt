@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.InterpreterMode
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,7 +22,7 @@ import com.example.translateapp.viewmodel.AppViewModel
 
 sealed class AppTab(val label: String) {
     object Translate   : AppTab("Translate")
-    object Speech      : AppTab("Text→Speech")
+    object Speech      : AppTab("Speech→Speech")
     object PhotoSpeech : AppTab("Photo→Speech")
     object History     : AppTab("History")
     object Packs       : AppTab("Packs")
@@ -66,7 +66,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     onClick = { selectedTab = AppTab.Translate }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.RecordVoiceOver, contentDescription = null) },
+                    icon = { Icon(Icons.Default.InterpreterMode, contentDescription = null) },
                     label = { Text("Speech") },
                     selected = selectedTab is AppTab.Speech,
                     onClick = { selectedTab = AppTab.Speech }
@@ -97,8 +97,6 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     icon = {
                         BadgedBox(
                             badge = {
-                                // Badge shows how many packs still need downloading (or are actively DLing)
-                                val activeOrPending = downloading.size + notDownloadedCount.coerceAtMost(99)
                                 if (downloading.isNotEmpty()) {
                                     Badge(containerColor = MaterialTheme.colorScheme.tertiary) {
                                         Text(downloading.size.toString())
@@ -130,7 +128,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
             ) { tab ->
                 when (tab) {
                     is AppTab.Translate   -> TranslateScreen(vm)
-                    is AppTab.Speech      -> TextToSpeechScreen(vm)
+                    is AppTab.Speech      -> SpeechToSpeechScreen(vm)
                     is AppTab.PhotoSpeech -> PhotoToSpeechScreen(vm)
                     is AppTab.History     -> HistoryScreen(vm) { selectedTab = AppTab.Translate }
                     is AppTab.Packs       -> LanguagePacksScreen(vm)

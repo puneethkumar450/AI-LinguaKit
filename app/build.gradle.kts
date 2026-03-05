@@ -56,6 +56,7 @@ dependencies {
     // ML Kit
     implementation(libs.mlkit.translate)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.language.id)
 
     // Coil
     implementation(libs.coil.compose)

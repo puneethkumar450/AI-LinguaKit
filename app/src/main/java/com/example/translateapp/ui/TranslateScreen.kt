@@ -1,11 +1,14 @@
 package com.example.translateapp.ui
 
+import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,12 +18,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.translateapp.data.PackStatus
+import com.example.translateapp.ui.theme.TranslateAppTheme
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.AppViewModel.TranslateSource
 import com.example.translateapp.viewmodel.LanguageOption
+import com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
 
 @Composable
 fun TranslateScreen(vm: AppViewModel) {
@@ -53,28 +59,31 @@ fun TranslateScreen(vm: AppViewModel) {
         OfflineReadinessBanner(srcReady = srcReady, tgtReady = tgtReady, srcLang = sourceLang, tgtLang = targetLang)
 
         // ── Language row ──────────────────────────────────────────────────────
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            LanguageDropdownWithStatus(
-                selected = sourceLang,
-                isDownloaded = srcReady,
-                onSelect = { vm.setTranslateSourceLang(it) }
-            )
-            IconButton(onClick = { vm.swapTranslateLanguages() }) {
-                Icon(
-                    Icons.Default.SwapHoriz,
-                    contentDescription = "Swap languages",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                Text("From", style = MaterialTheme.typography.labelSmall)
+                LanguageDropdownWithStatus(selected = sourceLang,
+                    isDownloaded = srcReady,
+                    onSelect = { vm.setTranslateSourceLang(it) })
             }
-            LanguageDropdownWithStatus(
-                selected = targetLang,
-                isDownloaded = tgtReady,
-                onSelect = { vm.setTranslateTargetLang(it) }
-            )
+
+            IconButton(onClick = { vm.swapTranslateLanguages() }) {
+                Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = MaterialTheme.colorScheme.primary)
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                Text("To", style = MaterialTheme.typography.labelSmall)
+
+                LanguageDropdownWithStatus(selected = targetLang,
+                    isDownloaded = tgtReady,
+                    onSelect = { vm.setTranslateTargetLang(it) })
+            }
         }
 
         // ── Input ─────────────────────────────────────────────────────────────
@@ -177,7 +186,7 @@ fun TranslateScreen(vm: AppViewModel) {
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
-                                    if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                    if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                                     contentDescription = "Speak",
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
@@ -243,10 +252,6 @@ private fun TranslateSourceBadge(source: TranslateSource) {
 }
 
 private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component1() = a
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component2() = b
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component3() = c
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component4() = d
 
 /** Banner shown below the top bar to communicate translation mode. */
 @Composable
@@ -317,7 +322,7 @@ private fun LanguageDropdownWithStatus(
     onSelect: (LanguageOption) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val allLanguages = com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
+    val allLanguages = SUPPORTED_LANGUAGES
 
     Box {
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
@@ -351,5 +356,15 @@ private fun LanguageDropdownWithStatus(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun TranslateScreenPreview() {
+    TranslateAppTheme {
+        TranslateScreen(AppViewModel(
+            application = Application
+        ))
     }
 }

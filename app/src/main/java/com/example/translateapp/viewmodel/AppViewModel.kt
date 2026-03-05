@@ -1,7 +1,12 @@
 package com.example.translateapp.viewmodel
 
 import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -9,15 +14,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
-import com.example.translateapp.data.PackStatus
 import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.service.ConnectivityHelper
+import com.example.translateapp.service.LanguagePackRepository
+import com.example.translateapp.service.ModelDownloadManager
+import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import com.example.translateapp.service.LanguagePackRepository
-import com.example.translateapp.service.ModelDownloadManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +39,8 @@ import kotlin.coroutines.resume
 // ── Language definitions ──────────────────────────────────────────────────────
 
 data class LanguageOption(val code: String, val displayName: String, val mlKitCode: String)
+
+val AUTO_DETECT_OPTION = LanguageOption("auto", "Auto Detect", "auto")
 
 val SUPPORTED_LANGUAGES = listOf(
     LanguageOption("en", "English",    TranslateLanguage.ENGLISH),
@@ -101,7 +108,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _translatedText     = MutableStateFlow("")
     val translatedText: StateFlow<String> = _translatedText.asStateFlow()
 
-    private val _translateSourceLang = MutableStateFlow(SUPPORTED_LANGUAGES[0])
+    private val _translateSourceLang = MutableStateFlow(AUTO_DETECT_OPTION)
     val translateSourceLang: StateFlow<LanguageOption> = _translateSourceLang.asStateFlow()
 
     private val _translateTargetLang = MutableStateFlow(SUPPORTED_LANGUAGES[1])
@@ -113,13 +120,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _translateError     = MutableStateFlow<String?>(null)
     val translateError: StateFlow<String?> = _translateError.asStateFlow()
 
-    /**
-     * How the last translation result was produced — drives UI badges.
-     *   NONE        = no result yet
-     *   OFFLINE     = used on-device model (no network needed)
-     *   ONLINE      = used network, no pack downloaded
-     *   HISTORY     = served from local history cache (device was offline)
-     */
     enum class TranslateSource { NONE, OFFLINE, ONLINE, HISTORY }
 
     private val _translateSource = MutableStateFlow(TranslateSource.NONE)
@@ -131,6 +131,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _ttsLanguage = MutableStateFlow(SUPPORTED_LANGUAGES[0])
     val ttsLanguage: StateFlow<LanguageOption> = _ttsLanguage.asStateFlow()
+
+    // ── Speech to Speech feature ──────────────────────────────────────────────
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+    private val _detectedLanguage = MutableStateFlow<LanguageOption?>(null)
+    val detectedLanguage: StateFlow<LanguageOption?> = _detectedLanguage.asStateFlow()
+
+    private var speechRecognizer: SpeechRecognizer? = null
 
     // ── OCR feature ───────────────────────────────────────────────────────────
     private val _ocrText            = MutableStateFlow("")
@@ -161,28 +170,110 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         packRepo.initAsync()
+        initTts(application)
+        initSpeechRecognizer(application)
+    }
+
+    private fun initTts(application: Application) {
         tts = TextToSpeech(application) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                Log.d("AppViewModel", "TTS initialized successfully")
                 _ttsReady.value = true
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(id: String?) { 
-                        Log.d("AppViewModel", "TTS started: $id")
-                        _isSpeaking.value = true 
-                    }
-                    override fun onDone(id: String?)  { 
-                        Log.d("AppViewModel", "TTS done: $id")
-                        _isSpeaking.value = false 
-                    }
-                    override fun onError(id: String?) { 
-                        Log.e("AppViewModel", "TTS error: $id")
-                        _isSpeaking.value = false 
-                    }
+                    override fun onStart(id: String?) { _isSpeaking.value = true }
+                    override fun onDone(id: String?)  { _isSpeaking.value = false }
+                    override fun onError(id: String?) { _isSpeaking.value = false }
                 })
-            } else {
-                Log.e("AppViewModel", "TTS initialization failed with status: $status")
             }
         }
+    }
+
+    private fun initSpeechRecognizer(application: Application) {
+        if (SpeechRecognizer.isRecognitionAvailable(application)) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) { _isRecording.value = true }
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() { _isRecording.value = false }
+                    override fun onError(error: Int) {
+                        _isRecording.value = false
+                        Log.e("AppViewModel", "Speech recognition error: $error")
+                    }
+                    override fun onResults(results: Bundle?) {
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        if (!matches.isNullOrEmpty()) {
+                            val text = matches[0]
+                            onTtsInputChange(text)
+                            handleSpeechResult(text)
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+        }
+    }
+
+    // ── Speech actions ────────────────────────────────────────────────────────
+
+    fun startRecording() {
+        val currentSource = _translateSourceLang.value
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            if (currentSource != AUTO_DETECT_OPTION) {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentSource.code)
+            } else {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            }
+        }
+        speechRecognizer?.startListening(intent)
+    }
+
+    fun stopRecording() {
+        speechRecognizer?.stopListening()
+        _isRecording.value = false
+    }
+
+    fun clearTranslation() {
+        _translateInput.value = ""
+        _translatedText.value = ""
+        _translateError.value = null
+        _translateSource.value = TranslateSource.NONE
+        _detectedLanguage.value = null
+        stopSpeaking()
+    }
+
+    private fun handleSpeechResult(text: String) {
+        if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
+            detectLanguageAndTranslate(text)
+        } else {
+            _translateInput.value = text
+            _detectedLanguage.value = null
+            translate()
+        }
+    }
+
+    private fun detectLanguageAndTranslate(text: String) {
+        val languageIdentifier = LanguageIdentification.getClient()
+        languageIdentifier.identifyLanguage(text)
+            .addOnSuccessListener { languageCode ->
+                if (languageCode != "und") {
+                    val detected = SUPPORTED_LANGUAGES.find { it.code == languageCode }
+                    _detectedLanguage.value = detected
+                    _translateInput.value = text
+                    translate()
+                } else {
+                    _translateInput.value = text
+                    _detectedLanguage.value = null
+                    translate()
+                }
+            }
+            .addOnFailureListener {
+                _translateInput.value = text
+                _detectedLanguage.value = null
+                translate()
+            }
     }
 
     // ── Translate actions ─────────────────────────────────────────────────────
@@ -209,6 +300,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun swapTranslateLanguages() {
         val src = _translateSourceLang.value
         val tgt = _translateTargetLang.value
+        if (src == AUTO_DETECT_OPTION) return // Cannot swap if source is auto-detect
+        
         _translateSourceLang.value = tgt
         _translateTargetLang.value = src
         val input  = _translateInput.value
@@ -222,7 +315,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun translate() {
         val text = _translateInput.value.trim()
         if (text.isBlank()) return
-        val src = _translateSourceLang.value
+        
+        val src = if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
+            _detectedLanguage.value ?: SUPPORTED_LANGUAGES[0] // Fallback to first if detection failed
+        } else {
+            _translateSourceLang.value
+        }
+
         val tgt = _translateTargetLang.value
 
         viewModelScope.launch {
@@ -235,87 +334,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val isOnline   = ConnectivityHelper.isOnline(getApplication())
 
                 when {
-                    // ── 1. Both packs downloaded → pure offline ───────────────
                     packsReady -> {
                         val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
                         _translateSource.value = TranslateSource.OFFLINE
                         saveHistory(text, result, src, tgt)
                     }
-
-                    // ── 2. Packs missing but online → lightweight cloud translate
                     isOnline -> {
                         val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
                         _translateSource.value = TranslateSource.ONLINE
                         saveHistory(text, result, src, tgt)
                     }
-
-                    // ── 3. Offline + no pack → check history cache ────────────
                     else -> {
                         val cached = historyDao.findInHistory(text, src.code, tgt.code)
                         if (cached != null) {
                             _translatedText.value  = cached.translatedText
                             _translateSource.value = TranslateSource.HISTORY
                         } else {
-                            // Nothing we can do — tell the user clearly
                             _translateError.value = buildOfflineError(src, tgt)
                         }
                     }
                 }
             } catch (e: Exception) {
-                // If online translate threw a network error, still try history
-                val isNetworkError = isNetworkException(e)
-                if (isNetworkError) {
-                    val src2 = _translateSourceLang.value
-                    val tgt2 = _translateTargetLang.value
-                    val text2 = _translateInput.value.trim()
-                    val cached = historyDao.findInHistory(text2, src2.code, tgt2.code)
-                    if (cached != null) {
-                        _translatedText.value  = cached.translatedText
-                        _translateSource.value = TranslateSource.HISTORY
-                    } else {
-                        _translateError.value = buildOfflineError(src2, tgt2)
-                    }
-                } else {
-                    _translateError.value = "Translation failed: ${e.message}"
-                }
-                Log.e("AppViewModel", "translate error", e)
+                _translateError.value = "Translation failed: ${e.message}"
             } finally {
                 _translateLoading.value = false
             }
         }
     }
 
-    private fun isNetworkException(e: Exception): Boolean {
-        val msg = e.message?.lowercase() ?: ""
-        return msg.contains("no internet") ||
-               msg.contains("network") ||
-               msg.contains("unable to resolve") ||
-               msg.contains("failed to connect") ||
-               msg.contains("timeout") ||
-               e is java.net.UnknownHostException ||
-               e is java.net.SocketTimeoutException ||
-               e is java.io.IOException
-    }
-
     private fun buildOfflineError(src: LanguageOption, tgt: LanguageOption): String {
-        return "You're offline and \"${src.displayName} → ${tgt.displayName}\" " +
-               "language pack isn't downloaded.\n\n" +
-               "• Connect to the internet to translate, or\n" +
-               "• Download the language pack in the Packs tab to work fully offline."
+        return "You're offline and \"${src.displayName} → ${tgt.displayName}\" pack isn't downloaded."
     }
 
-    private suspend fun saveHistory(
-        sourceText: String,
-        translatedText: String,
-        src: LanguageOption,
-        tgt: LanguageOption
-    ) {
+    private suspend fun saveHistory(text: String, result: String, src: LanguageOption, tgt: LanguageOption) {
         historyDao.insert(
             TranslationHistoryEntity(
-                sourceText     = sourceText,
-                translatedText = translatedText,
+                sourceText = text,
+                translatedText = result,
                 sourceLangCode = src.code,
                 sourceLangName = src.displayName,
                 targetLangCode = tgt.code,
@@ -332,9 +389,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 packRepo.downloadPack(mlKitCode, requireWifi)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-                _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready for offline use!")
-            } catch (e: Exception) {
-                _uiMessage.emit("Download failed: ${e.message}")
+                _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
             } finally {
                 _downloadingPacks.value = _downloadingPacks.value - mlKitCode
             }
@@ -343,13 +398,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deletePack(mlKitCode: String) {
         viewModelScope.launch {
-            try {
-                packRepo.deletePack(mlKitCode)
-                val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-                _uiMessage.emit("${lang?.displayName ?: mlKitCode} model removed.")
-            } catch (e: Exception) {
-                _uiMessage.emit("Delete failed: ${e.message}")
-            }
+            packRepo.deletePack(mlKitCode)
+            val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
+            _uiMessage.emit("${lang?.displayName ?: mlKitCode} removed.")
         }
     }
 
@@ -363,35 +414,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setTtsLanguage(lang: LanguageOption) { _ttsLanguage.value = lang }
 
     fun speakText(text: String, langCode: String) {
-        Log.d("AppViewModel", "speakText: text='$text', langCode='$langCode', ttsReady=${_ttsReady.value}")
         if (!_ttsReady.value || text.isBlank()) return
-        
-        val locale = Locale.forLanguageTag(langCode)
-        Log.d("AppViewModel", "Setting TTS language to $locale")
-        
-        val result = tts?.setLanguage(locale)
+        val result = tts?.setLanguage(Locale.forLanguageTag(langCode))
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w("AppViewModel", "Language $langCode not supported or missing data, falling back to English")
             tts?.language = Locale.ENGLISH
         }
-        
         tts?.stop()
-        val speechResult = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
-        Log.d("AppViewModel", "tts.speak result: $speechResult")
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
     }
 
-    fun stopSpeaking() { 
-        Log.d("AppViewModel", "stopSpeaking")
-        tts?.stop()
-        _isSpeaking.value = false 
-    }
+    fun stopSpeaking() { tts?.stop(); _isSpeaking.value = false }
 
     // ── OCR actions ───────────────────────────────────────────────────────────
 
     fun setOcrBitmap(bitmap: Bitmap) {
         _ocrSelectedBitmap.value = bitmap
-        _ocrText.value  = ""
-        _ocrError.value = null
+        _ocrText.value = ""
         recognizeText(bitmap)
     }
 
@@ -400,12 +438,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun recognizeText(bitmap: Bitmap) {
         viewModelScope.launch {
             _ocrLoading.value = true
-            _ocrError.value   = null
             try {
                 _ocrText.value = runOcr(bitmap)
-            } catch (e: Exception) {
-                _ocrError.value = "Text recognition failed: ${e.message}"
-                Log.e("AppViewModel", "ocr error", e)
             } finally {
                 _ocrLoading.value = false
             }
@@ -420,7 +454,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .addOnFailureListener { e -> cont.cancel(e); recognizer.close() }
     }
 
-    fun clearOcr() { _ocrSelectedBitmap.value = null; _ocrText.value = ""; _ocrError.value = null }
+    fun clearOcr() { _ocrSelectedBitmap.value = null; _ocrText.value = "" }
 
     // ── History actions ───────────────────────────────────────────────────────
 
@@ -448,7 +482,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        tts?.stop()
         tts?.shutdown()
+        speechRecognizer?.destroy()
     }
 }
