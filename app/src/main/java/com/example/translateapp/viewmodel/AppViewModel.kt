@@ -142,8 +142,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var speechRecognizer: SpeechRecognizer? = null
 
     // ── OCR feature ───────────────────────────────────────────────────────────
+    private val _isLiveCameraMode   = MutableStateFlow(false)
+    val isLiveCameraMode: StateFlow<Boolean> = _isLiveCameraMode.asStateFlow()
+
+    fun setLiveCameraMode(enabled: Boolean) {
+        _isLiveCameraMode.value = enabled
+    }
+
     private val _ocrText            = MutableStateFlow("")
     val ocrText: StateFlow<String>  = _ocrText.asStateFlow()
+
+    private val _ocrTranslatedText  = MutableStateFlow("")
+    val ocrTranslatedText: StateFlow<String> = _ocrTranslatedText.asStateFlow()
 
     private val _ocrLoading         = MutableStateFlow(false)
     val ocrLoading: StateFlow<Boolean> = _ocrLoading.asStateFlow()
@@ -430,6 +440,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setOcrBitmap(bitmap: Bitmap) {
         _ocrSelectedBitmap.value = bitmap
         _ocrText.value = ""
+        _ocrTranslatedText.value = ""
         recognizeText(bitmap)
     }
 
@@ -439,10 +450,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _ocrLoading.value = true
             try {
-                _ocrText.value = runOcr(bitmap)
+                val extracted = runOcr(bitmap)
+                _ocrText.value = extracted
+                
+                // Automatically translate the extracted text
+                if (extracted.isNotBlank()) {
+                    translateOcrText(extracted)
+                }
             } finally {
                 _ocrLoading.value = false
             }
+        }
+    }
+
+    private suspend fun translateOcrText(text: String) {
+        val target = _translateTargetLang.value
+        try {
+            // Using auto-detect logic or assuming English as base
+            val result = downloader.translateOnline(text, TranslateLanguage.ENGLISH, target.mlKitCode)
+            _ocrTranslatedText.value = result
+        } catch (e: Exception) {
+            Log.e("AppViewModel", "OCR Translation failed", e)
         }
     }
 
@@ -454,7 +482,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .addOnFailureListener { e -> cont.cancel(e); recognizer.close() }
     }
 
-    fun clearOcr() { _ocrSelectedBitmap.value = null; _ocrText.value = "" }
+    fun clearOcr() { 
+        _ocrSelectedBitmap.value = null
+        _ocrText.value = ""
+        _ocrTranslatedText.value = ""
+    }
 
     // ── History actions ───────────────────────────────────────────────────────
 

@@ -1,6 +1,5 @@
 package com.example.translateapp.ui
 
-import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,7 +35,6 @@ fun TranslateScreen(vm: AppViewModel) {
     val targetLang  by vm.translateTargetLang.collectAsState()
     val loading     by vm.translateLoading.collectAsState()
     val error       by vm.translateError.collectAsState()
-    val clipboard   = LocalClipboardManager.current
     val translateSource by vm.translateSource.collectAsState()
     val isSpeaking by vm.isSpeaking.collectAsState()
 
@@ -45,6 +43,49 @@ fun TranslateScreen(vm: AppViewModel) {
     val tgtPack by vm.observePackStatus(targetLang.mlKitCode).collectAsState(initial = null)
     val srcReady = srcPack?.status == PackStatus.DOWNLOADED
     val tgtReady = tgtPack?.status == PackStatus.DOWNLOADED
+
+    TranslateScreenContent(
+        input = input,
+        output = output,
+        sourceLang = sourceLang,
+        targetLang = targetLang,
+        loading = loading,
+        error = error,
+        translateSource = translateSource,
+        isSpeaking = isSpeaking,
+        srcReady = srcReady,
+        tgtReady = tgtReady,
+        onInputChange = { vm.onTranslateInputChange(it) },
+        onSourceLangSelect = { vm.setTranslateSourceLang(it) },
+        onTargetLangSelect = { vm.setTranslateTargetLang(it) },
+        onSwapLanguages = { vm.swapTranslateLanguages() },
+        onTranslate = { vm.translate() },
+        onSpeak = { text, lang -> vm.speakText(text, lang) },
+        onStopSpeaking = { vm.stopSpeaking() }
+    )
+}
+
+@Composable
+private fun TranslateScreenContent(
+    input: String,
+    output: String,
+    sourceLang: LanguageOption,
+    targetLang: LanguageOption,
+    loading: Boolean,
+    error: String?,
+    translateSource: TranslateSource,
+    isSpeaking: Boolean,
+    srcReady: Boolean,
+    tgtReady: Boolean,
+    onInputChange: (String) -> Unit,
+    onSourceLangSelect: (LanguageOption) -> Unit,
+    onTargetLangSelect: (LanguageOption) -> Unit,
+    onSwapLanguages: () -> Unit,
+    onTranslate: () -> Unit,
+    onSpeak: (String, String) -> Unit,
+    onStopSpeaking: () -> Unit
+) {
+    val clipboard = LocalClipboardManager.current
     val bothReady = srcReady && tgtReady
 
     Column(
@@ -59,37 +100,34 @@ fun TranslateScreen(vm: AppViewModel) {
         OfflineReadinessBanner(srcReady = srcReady, tgtReady = tgtReady, srcLang = sourceLang, tgtLang = targetLang)
 
         // ── Language row ──────────────────────────────────────────────────────
-
         Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                Text("From", style = MaterialTheme.typography.labelSmall)
-                LanguageDropdownWithStatus(selected = sourceLang,
-                    isDownloaded = srcReady,
-                    onSelect = { vm.setTranslateSourceLang(it) })
+            LanguageDropdownWithStatus(
+                selected = sourceLang,
+                isDownloaded = srcReady,
+                onSelect = onSourceLangSelect
+            )
+            IconButton(onClick = onSwapLanguages) {
+                Icon(
+                    Icons.Default.SwapHoriz,
+                    contentDescription = "Swap languages",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
-
-            IconButton(onClick = { vm.swapTranslateLanguages() }) {
-                Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = MaterialTheme.colorScheme.primary)
-            }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                Text("To", style = MaterialTheme.typography.labelSmall)
-
-                LanguageDropdownWithStatus(selected = targetLang,
-                    isDownloaded = tgtReady,
-                    onSelect = { vm.setTranslateTargetLang(it) })
-            }
+            LanguageDropdownWithStatus(
+                selected = targetLang,
+                isDownloaded = tgtReady,
+                onSelect = onTargetLangSelect
+            )
         }
 
         // ── Input ─────────────────────────────────────────────────────────────
         OutlinedTextField(
             value = input,
-            onValueChange = { vm.onTranslateInputChange(it) },
+            onValueChange = onInputChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 120.dp),
@@ -101,7 +139,7 @@ fun TranslateScreen(vm: AppViewModel) {
 
         // ── Translate button ──────────────────────────────────────────────────
         Button(
-            onClick = { vm.translate() },
+            onClick = onTranslate,
             enabled = input.isNotBlank() && !loading,
             modifier = Modifier
                 .fillMaxWidth()
@@ -180,8 +218,8 @@ fun TranslateScreen(vm: AppViewModel) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = {
-                                    if (isSpeaking) vm.stopSpeaking()
-                                    else vm.speakText(output, targetLang.code)
+                                    if (isSpeaking) onStopSpeaking()
+                                    else onSpeak(output, targetLang.code)
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
@@ -361,10 +399,26 @@ private fun LanguageDropdownWithStatus(
 
 @Preview(showBackground = true)
 @Composable
-private fun TranslateScreenPreview() {
+fun TranslateScreenPreview() {
     TranslateAppTheme {
-        TranslateScreen(AppViewModel(
-            application = Application
-        ))
+        TranslateScreenContent(
+            input = "Hello, how are you?",
+            output = "Bonjour, comment allez-vous ?",
+            sourceLang = SUPPORTED_LANGUAGES[0],
+            targetLang = SUPPORTED_LANGUAGES[2],
+            loading = false,
+            error = null,
+            translateSource = TranslateSource.ONLINE,
+            isSpeaking = false,
+            srcReady = true,
+            tgtReady = true,
+            onInputChange = {},
+            onSourceLangSelect = {},
+            onTargetLangSelect = {},
+            onSwapLanguages = {},
+            onTranslate = {},
+            onSpeak = { _, _ -> },
+            onStopSpeaking = {}
+        )
     }
 }

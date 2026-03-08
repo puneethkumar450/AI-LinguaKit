@@ -31,12 +31,22 @@ import com.example.translateapp.viewmodel.AppViewModel
 fun PhotoToSpeechScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val ocrText by vm.ocrText.collectAsState()
+    val ocrTranslatedText by vm.ocrTranslatedText.collectAsState()
     val ocrLoading by vm.ocrLoading.collectAsState()
     val ocrError by vm.ocrError.collectAsState()
     val bitmap by vm.ocrSelectedBitmap.collectAsState()
     val ttsReady by vm.ttsReady.collectAsState()
     val isSpeaking by vm.isSpeaking.collectAsState()
     val ocrTtsLang by vm.ocrTtsLanguage.collectAsState()
+    val targetLang by vm.translateTargetLang.collectAsState()
+
+    var showLiveCamera by remember { mutableStateOf(false) }
+
+    if (showLiveCamera) {
+        // Full screen Live AR Translation
+        LiveTranslationScreen(vm = vm, onDismiss = { showLiveCamera = false })
+        return
+    }
 
     // Gallery picker
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -47,21 +57,6 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
             val bmp = BitmapFactory.decodeStream(stream)
             stream?.close()
             bmp?.let { b -> vm.setOcrBitmap(b) }
-        }
-    }
-
-    // Camera capture
-    var cameraUri by remember { mutableStateOf<Uri?>(null) }
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            cameraUri?.let {
-                val stream = context.contentResolver.openInputStream(it)
-                val bmp = BitmapFactory.decodeStream(stream)
-                stream?.close()
-                bmp?.let { b -> vm.setOcrBitmap(b) }
-            }
         }
     }
 
@@ -78,41 +73,43 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
             fontWeight = FontWeight.Bold
         )
         Text(
-            "Pick or capture a photo, extract text with OCR, then hear it spoken.",
+            "Extract and speak text from your gallery images or use the Live AR camera.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
 
-        // Image picker buttons
+        // Integrated Buttons Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Live AR Button (Now the primary camera action)
+            Button(
+                onClick = { showLiveCamera = true },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Live Camera", fontWeight = FontWeight.Bold)
+            }
+
+            // Gallery Button
             OutlinedButton(
                 onClick = { galleryLauncher.launch("image/*") },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text("Gallery")
-            }
-            Button(
-                onClick = {
-                    val uri = createTempImageUri(context)
-                    cameraUri = uri
-                    cameraLauncher.launch(uri)
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Camera")
             }
         }
 
-        // Preview image
+        Divider()
+
+        // Preview image (for gallery selections)
         bitmap?.let { bmp ->
             Box(
                 modifier = Modifier
@@ -141,7 +138,7 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(Modifier.height(8.dp))
-                            Text("Recognizing text…", style = MaterialTheme.typography.bodySmall)
+                            Text("Processing with AI…", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -172,7 +169,7 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "No image selected",
+                        "No gallery image selected",
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         textAlign = TextAlign.Center
                     )
@@ -211,7 +208,7 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Extracted Text",
+                            "Extracted Text (Original)",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -229,32 +226,62 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
                     }
                 }
             }
+        }
 
-            // Language for TTS
+        // AI Translated text result
+        if (ocrTranslatedText.isNotBlank()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "AI Translation (${targetLang.displayName})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    SelectionContainer {
+                        Text(
+                            ocrTranslatedText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Language selector for TTS (Target language is default)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Speak in:", style = MaterialTheme.typography.labelLarge)
+                Text("Speak Translation in:", style = MaterialTheme.typography.labelLarge)
                 LanguageDropdown(
-                    selected = ocrTtsLang,
-                    onSelect = { vm.setOcrTtsLanguage(it) }
+                    selected = targetLang,
+                    onSelect = { vm.setTranslateTargetLang(it) }
                 )
             }
 
-            // Speak button
+            // Speak button for Translation
             if (!isSpeaking) {
                 Button(
-                    onClick = { vm.speakText(ocrText, ocrTtsLang.code) },
+                    onClick = { vm.speakText(ocrTranslatedText, targetLang.code) },
                     enabled = ttsReady,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                 ) {
                     Icon(Icons.Default.VolumeUp, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Speak Extracted Text", fontWeight = FontWeight.SemiBold)
+                    Text("Speak Translation", fontWeight = FontWeight.SemiBold)
                 }
             } else {
                 OutlinedButton(
@@ -269,16 +296,13 @@ fun PhotoToSpeechScreen(vm: AppViewModel) {
                     Text("Stop Speaking", fontWeight = FontWeight.SemiBold)
                 }
             }
+        } else if (ocrText.isNotBlank() && !ocrLoading) {
+            // If text is extracted but translation hasn't happened yet (maybe offline)
+            Text(
+                "Translating...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
         }
     }
-}
-
-// Helper to create a content:// URI for camera capture
-private fun createTempImageUri(context: android.content.Context): Uri {
-    val file = java.io.File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
-    return androidx.core.content.FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        file
-    )
 }

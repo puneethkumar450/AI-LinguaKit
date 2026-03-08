@@ -35,6 +35,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
     val historyItems by vm.allHistory.collectAsState()
     val allPacks     by vm.allPacks.collectAsState()
     val downloading  by vm.downloadingPacks.collectAsState()
+    val isLiveCameraMode by vm.isLiveCameraMode.collectAsState()
 
     // Snackbar host
     val snackbarHostState = remember { SnackbarHostState() }
@@ -42,6 +43,12 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
         vm.uiMessage.collect { msg ->
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
         }
+    }
+
+    // If we are in live camera mode, we show ONLY the camera, bypassing Scaffold
+    if (isLiveCameraMode) {
+        LiveTranslationScreen(vm = vm, onDismiss = { vm.setLiveCameraMode(false) })
+        return
     }
 
     val notDownloadedCount = allPacks.count { it.status != PackStatus.DOWNLOADED }
@@ -127,7 +134,11 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 label = "tab_transition"
             ) { tab ->
                 when (tab) {
-                    is AppTab.Translate   -> TranslateScreen(vm)
+                    is AppTab.Translate   -> ModernTranslateScreen(
+                        vm = vm,
+                        onConversationClick = { selectedTab = AppTab.Speech },
+                        onCameraClick = { selectedTab = AppTab.PhotoSpeech }
+                    )
                     is AppTab.Speech      -> SpeechToSpeechScreen(vm)
                     is AppTab.PhotoSpeech -> PhotoToSpeechScreen(vm)
                     is AppTab.History     -> HistoryScreen(vm) { selectedTab = AppTab.Translate }

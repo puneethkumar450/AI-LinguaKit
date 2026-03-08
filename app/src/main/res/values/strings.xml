@@ -1,3 +1,8 @@
 <resources>
-    <string name="app_name">NewTranslation</string>
+    <string name="app_name">AI-LinguaKit</string>
+    <string name="enter_text_placeholder">Enter text</string>
+    <string name="conversation_label">Conversation</string>
+    <string name="camera_label">Camera</string>
+    <string name="english_label">English</string>
+    <string name="italian_label">Italian</string>
 </resources>
