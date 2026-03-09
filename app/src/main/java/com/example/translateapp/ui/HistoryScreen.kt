@@ -32,10 +32,7 @@ import java.util.*
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(
-    vm: AppViewModel,
-    onRestoreEntry: () -> Unit  // navigate back to Translate tab
-) {
+fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
     val allHistory by vm.allHistory.collectAsState()
     val favorites by vm.favorites.collectAsState()
     val filter by vm.historyFilter.collectAsState()
@@ -161,7 +158,6 @@ fun HistoryScreen(
                         onDelete = { vm.deleteHistoryEntry(entry) },
                         onRestore = {
                             vm.restoreFromHistory(entry)
-                            onRestoreEntry()
                         },
                         modifier = Modifier.animateItemPlacement(tween(200))
                     )

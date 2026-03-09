@@ -27,9 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
@@ -38,7 +36,7 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguagePacksScreen(vm: AppViewModel) {
+fun LanguagePacksScreen(vm: AppViewModel, onBack: () -> Boolean) {
     val allPacks        by vm.allPacks.collectAsState()
     val downloading     by vm.downloadingPacks.collectAsState()
     var wifiOnly        by remember { mutableStateOf(true) }

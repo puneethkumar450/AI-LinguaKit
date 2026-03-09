@@ -53,6 +53,9 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.material)
 
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
+
     // ML Kit
     implementation(libs.mlkit.translate)
     implementation(libs.mlkit.text.recognition)
