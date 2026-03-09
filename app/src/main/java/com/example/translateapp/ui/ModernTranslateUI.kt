@@ -35,6 +35,7 @@ import com.example.translateapp.viewmodel.AUTO_DETECT_OPTION
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.LanguageOption
 import com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
+import kotlinx.coroutines.delay
 
 private enum class SelectionState {
     MAIN, SOURCE, TARGET
@@ -52,6 +53,16 @@ fun ModernTranslateScreen(
     val translatedText by vm.translatedText.collectAsState()
     val sourceLang by vm.translateSourceLang.collectAsState()
     val targetLang by vm.translateTargetLang.collectAsState()
+    val loading by vm.translateLoading.collectAsState()
+    val isRecording by vm.isRecording.collectAsState()
+
+    // Debounced automatic translation - Defaulting to ML Kit Online Mode behavior via ViewModel
+    LaunchedEffect(input, sourceLang, targetLang) {
+        if (input.isNotBlank()) {
+            delay(600) // Debounce typing
+            vm.translate()
+        }
+    }
 
     AnimatedContent(
         targetState = currentState,
@@ -62,12 +73,16 @@ fun ModernTranslateScreen(
             SelectionState.MAIN -> {
                 ModernTranslateScreenContent(
                     input = input,
+                    loading = loading,
                     onInputChange = { vm.onTranslateInputChange(it) },
                     translatedText = translatedText,
                     sourceLanguage = sourceLang.displayName,
                     targetLanguage = targetLang.displayName,
                     onConversationClick = onConversationClick,
-                    onMicClick = { vm.translate() },
+                    onMicClick = { 
+                        if (isRecording) vm.stopRecording() else vm.startRecording()
+                    },
+                    isRecording = isRecording,
                     onCameraClick = onCameraClick,
                     onLanguageSwap = {
                         if (sourceLang != AUTO_DETECT_OPTION) {
@@ -204,10 +219,12 @@ private fun LanguagePickerScreen(
 @Composable
 private fun ModernTranslateScreenContent(
     input: String,
+    loading: Boolean,
     onInputChange: (String) -> Unit,
     translatedText: String,
     sourceLanguage: String,
     targetLanguage: String,
+    isRecording: Boolean,
     modifier: Modifier = Modifier,
     onConversationClick: () -> Unit = {},
     onMicClick: () -> Unit = {},
@@ -258,6 +275,16 @@ private fun ModernTranslateScreenContent(
                         cursorColor = Color.White
                     )
                 )
+
+                if (loading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        color = Color(0xFFF2B8B5),
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                }
 
                 if (translatedText.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(32.dp))
@@ -342,7 +369,7 @@ private fun ModernTranslateScreenContent(
                             onClick = onConversationClick
                         )
 
-                        MicButton(onClick = onMicClick)
+                        MicButton(onClick = onMicClick, isRecording = isRecording)
 
                         ActionItem(
                             icon = Icons.Default.CameraAlt,
@@ -418,20 +445,21 @@ private fun ActionItem(
 @Composable
 private fun MicButton(
     onClick: () -> Unit,
+    isRecording: Boolean,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .size(100.dp)
-            .background(Color(0xFFF2B8B5), CircleShape)
+            .background(if (isRecording) Color.Red else Color(0xFFF2B8B5), CircleShape)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = Icons.Default.Mic,
+            imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
             contentDescription = "Microphone",
-            tint = Color(0xFF601410),
+            tint = if (isRecording) Color.White else Color(0xFF601410),
             modifier = Modifier.size(36.dp)
         )
     }
@@ -443,10 +471,12 @@ private fun ModernTranslateScreenPreview() {
     TranslateAppTheme {
         ModernTranslateScreenContent(
             input = "Hello",
+            loading = false,
             onInputChange = {},
             translatedText = "Ciao",
             sourceLanguage = "English",
-            targetLanguage = "Italian"
+            targetLanguage = "Italian",
+            isRecording = false
         )
     }
 }

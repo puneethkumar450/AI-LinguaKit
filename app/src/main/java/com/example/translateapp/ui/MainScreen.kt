@@ -8,13 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.InterpreterMode
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.translateapp.data.PackStatus
@@ -22,8 +22,8 @@ import com.example.translateapp.viewmodel.AppViewModel
 
 sealed class AppTab(val label: String) {
     object Translate   : AppTab("Translate")
-    object Speech      : AppTab("Speech→Speech")
-    object PhotoSpeech : AppTab("Photo→Speech")
+    //object Speech      : AppTab("Speech→Speech")
+    //object PhotoSpeech : AppTab("Photo→Speech")
     object History     : AppTab("History")
     object Packs       : AppTab("Packs")
 }
@@ -72,7 +72,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     selected = selectedTab is AppTab.Translate,
                     onClick = { selectedTab = AppTab.Translate }
                 )
-                NavigationBarItem(
+                /*NavigationBarItem(
                     icon = { Icon(Icons.Default.InterpreterMode, contentDescription = null) },
                     label = { Text("Speech") },
                     selected = selectedTab is AppTab.Speech,
@@ -83,7 +83,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     label = { Text("Photo") },
                     selected = selectedTab is AppTab.PhotoSpeech,
                     onClick = { selectedTab = AppTab.PhotoSpeech }
-                )
+                )*/
                 NavigationBarItem(
                     icon = {
                         BadgedBox(
@@ -134,13 +134,9 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 label = "tab_transition"
             ) { tab ->
                 when (tab) {
-                    is AppTab.Translate   -> ModernTranslateScreen(
-                        vm = vm,
-                        onConversationClick = { selectedTab = AppTab.Speech },
-                        onCameraClick = { selectedTab = AppTab.PhotoSpeech }
-                    )
-                    is AppTab.Speech      -> SpeechToSpeechScreen(vm)
-                    is AppTab.PhotoSpeech -> PhotoToSpeechScreen(vm)
+                    is AppTab.Translate   -> ModernTranslateScreen(vm = vm)
+                    //is AppTab.Speech      -> SpeechToSpeechScreen(vm)
+                    //is AppTab.PhotoSpeech -> PhotoToSpeechScreen(vm)
                     is AppTab.History     -> HistoryScreen(vm) { selectedTab = AppTab.Translate }
                     is AppTab.Packs       -> LanguagePacksScreen(vm)
                 }
