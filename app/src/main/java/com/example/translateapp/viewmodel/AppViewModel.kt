@@ -18,7 +18,9 @@ import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.service.ConnectivityHelper
 import com.example.translateapp.service.LanguagePackRepository
 import com.example.translateapp.service.ModelDownloadManager
+import com.google.mlkit.nl.languageid.IdentifiedLanguage
 import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.languageid.LanguageIdentificationOptions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -218,7 +220,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             handleSpeechResult(text)
                         }
                     }
-                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onPartialResults(partialResults: Bundle?) {
+                       /* val partial = partialResults
+                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            ?.firstOrNull() ?: return
+
+                        // Show live feedback in the input field while recording
+                        _translateInput.value = partial*/
+                    }
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
@@ -234,7 +243,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (currentSource != AUTO_DETECT_OPTION) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentSource.code)
             } else {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
             }
         }
         speechRecognizer?.startListening(intent)
@@ -255,34 +264,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleSpeechResult(text: String) {
-        if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
-            detectLanguageAndTranslate(text)
-        } else {
-            _translateInput.value = text
+        _translateInput.value = text
+        if (_translateSourceLang.value != AUTO_DETECT_OPTION) {
             _detectedLanguage.value = null
-            translate()
         }
+        translate()
     }
 
-    private fun detectLanguageAndTranslate(text: String) {
-        val languageIdentifier = LanguageIdentification.getClient()
+    private suspend fun identifyLanguageSuspend(text: String): String = suspendCancellableCoroutine { cont ->
+        val options = LanguageIdentificationOptions.Builder()
+            .setConfidenceThreshold(0.15f)
+            .build()
+        val languageIdentifier = LanguageIdentification.getClient(options)
         languageIdentifier.identifyLanguage(text)
-            .addOnSuccessListener { languageCode ->
-                if (languageCode != "und") {
-                    val detected = SUPPORTED_LANGUAGES.find { it.code == languageCode }
-                    _detectedLanguage.value = detected
-                    _translateInput.value = text
-                    translate()
-                } else {
-                    _translateInput.value = text
-                    _detectedLanguage.value = null
-                    translate()
-                }
+            .addOnSuccessListener { 
+                cont.resume(it)
+                languageIdentifier.close()
             }
-            .addOnFailureListener {
-                _translateInput.value = text
-                _detectedLanguage.value = null
-                translate()
+            .addOnFailureListener { 
+                cont.resume("und")
+                languageIdentifier.close()
+            }
+    }
+
+    private suspend fun identifyPossibleLanguagesSuspend(text: String): List<IdentifiedLanguage> = suspendCancellableCoroutine { cont ->
+        val options = LanguageIdentificationOptions.Builder()
+            .setConfidenceThreshold(0.01f)
+            .build()
+        val languageIdentifier = LanguageIdentification.getClient(options)
+        languageIdentifier.identifyPossibleLanguages(text)
+            .addOnSuccessListener { 
+                cont.resume(it)
+                languageIdentifier.close()
+            }
+            .addOnFailureListener { 
+                cont.resume(emptyList())
+                languageIdentifier.close()
             }
     }
 
@@ -324,15 +341,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun translate() {
         val text = _translateInput.value.trim()
-        if (text.isBlank()) return
-        
-        val src = if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
-            _detectedLanguage.value ?: SUPPORTED_LANGUAGES[0] // Fallback to first if detection failed
-        } else {
-            _translateSourceLang.value
+        if (text.isBlank()) {
+            _translatedText.value = ""
+            return
         }
-
-        val tgt = _translateTargetLang.value
 
         viewModelScope.launch {
             _translateLoading.value = true
@@ -340,16 +352,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _translateSource.value  = TranslateSource.NONE
 
             try {
-                val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
+                val src = if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
+                    val detectedCode = identifyLanguageSuspend(text)
+                    var detected = if (detectedCode != "und") {
+                        SUPPORTED_LANGUAGES.find { 
+                            detectedCode == it.code || detectedCode.startsWith(it.code + "-") 
+                        }
+                    } else null
+                    
+                    if (detected == null) {
+                        val possible = identifyPossibleLanguagesSuspend(text)
+                        for (p in possible) {
+                            val found = SUPPORTED_LANGUAGES.find { 
+                                p.languageTag == it.code || p.languageTag.startsWith(it.code + "-") 
+                            }
+                            if (found != null) {
+                                detected = found
+                                break
+                            }
+                        }
+                    }
+
+                    _detectedLanguage.value = detected
+                    detected ?: SUPPORTED_LANGUAGES[0]
+                } else {
+                    _translateSourceLang.value
+                }
+
+                val tgt = _translateTargetLang.value
+
+               // val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
                 val isOnline   = ConnectivityHelper.isOnline(getApplication())
 
                 when {
-                    packsReady -> {
+                   /* packsReady -> {
                         val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
                         _translateSource.value = TranslateSource.OFFLINE
                         saveHistory(text, result, src, tgt)
-                    }
+                    }*/
                     isOnline -> {
                         val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
@@ -395,13 +436,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
         viewModelScope.launch {
-            _downloadingPacks.value = _downloadingPacks.value + mlKitCode
+            _downloadingPacks.value += mlKitCode
             try {
                 packRepo.downloadPack(mlKitCode, requireWifi)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
                 _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
             } finally {
-                _downloadingPacks.value = _downloadingPacks.value - mlKitCode
+                _downloadingPacks.value -= mlKitCode
             }
         }
     }

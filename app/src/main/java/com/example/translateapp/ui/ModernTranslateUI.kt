@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,12 +35,18 @@ import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.viewmodel.AUTO_DETECT_OPTION
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.LanguageOption
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.delay
 
 private enum class AppScreenState {
     MAIN
 }
 
+
+
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ModernTranslateScreen(vm: AppViewModel,
                           onNavigateToHistory: () -> Unit,
@@ -52,13 +59,21 @@ fun ModernTranslateScreen(vm: AppViewModel,
     val translatedText by vm.translatedText.collectAsState()
     val sourceLang by vm.translateSourceLang.collectAsState()
     val targetLang by vm.translateTargetLang.collectAsState()
+    val detectedLang by vm.detectedLanguage.collectAsState()
     val loading by vm.translateLoading.collectAsState()
+    val error by vm.translateError.collectAsState()
     val isRecording by vm.isRecording.collectAsState()
 
     val historyItems by vm.allHistory.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
     val downloading by vm.downloadingPacks.collectAsState()
-    val notDownloadedCount = allPacks.count { it.status != PackStatus.DOWNLOADED }
+    val notDownloadedCount by remember(allPacks) {
+        mutableStateOf(allPacks.count { it.status != PackStatus.DOWNLOADED })
+    }
+
+    val recordAudioPermissionState = rememberPermissionState(
+        android.Manifest.permission.RECORD_AUDIO
+    )
 
     // Automatic translation logic
     LaunchedEffect(input, sourceLang, targetLang) {
@@ -78,14 +93,23 @@ fun ModernTranslateScreen(vm: AppViewModel,
                 MainTranslateView(
                     input = input,
                     loading = loading,
+                    error = error,
                     translatedText = translatedText,
-                    sourceLanguage = sourceLang.displayName,
+                    sourceLanguage = if (sourceLang == AUTO_DETECT_OPTION) {
+                        if (detectedLang != null) "Auto (${detectedLang?.displayName})" else "Auto Detect"
+                    } else sourceLang.displayName,
                     targetLanguage = targetLang.displayName,
                     isRecording = isRecording,
                     historyCount = historyItems.size,
                     packsNotification = notDownloadedCount + downloading.size,
                     onInputChange = { vm.onTranslateInputChange(it) },
-                    onMicClick = { if (isRecording) vm.stopRecording() else vm.startRecording() },
+                    onMicClick = {
+                        if (recordAudioPermissionState.status.isGranted) {
+                            if (isRecording) vm.stopRecording() else vm.startRecording()
+                        } else {
+                            recordAudioPermissionState.launchPermissionRequest()
+                        }
+                    },
                     onLanguageSwap = { if (sourceLang != AUTO_DETECT_OPTION) vm.swapTranslateLanguages() },
                     onSourceLangClick = { onNavigateToSourcePicker() },
                     onTargetLangClick = { onNavigateToTargetPicker() },
@@ -102,6 +126,7 @@ fun ModernTranslateScreen(vm: AppViewModel,
 private fun MainTranslateView(
     input: String,
     loading: Boolean,
+    error: String?,
     translatedText: String,
     sourceLanguage: String,
     targetLanguage: String,
@@ -177,6 +202,15 @@ private fun MainTranslateView(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                         color = Color(0xFFF2B8B5),
                         trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                }
+
+                if (!error.isNullOrBlank()) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        textAlign = TextAlign.Center
                     )
                 }
 
@@ -296,46 +330,6 @@ fun LanguagePickerScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LanguagePacksView(vm: AppViewModel, onBack: () -> Unit) {
-    val allPacks by vm.allPacks.collectAsState()
-    val downloading by vm.downloadingPacks.collectAsState()
-
-    Scaffold(
-        containerColor = Color(0xFF140F0F),
-        topBar = {
-            TopAppBar(
-                title = { Text("Offline Packs", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { vm.refreshPackStatus() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF140F0F))
-            )
-        }
-    ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(allPacks, key = { it.mlKitCode }) { pack ->
-                PackCard(
-                    pack = pack,
-                    isDownloading = downloading.contains(pack.mlKitCode),
-                    onDownload = { vm.downloadPack(pack.mlKitCode, false) },
-                    onDelete = { vm.deletePack(pack.mlKitCode) }
-                )
-            }
-        }
-    }
-}
-
-// ── Components Re-used from existing screens ──
-
 @Composable
 private fun LanguageButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(onClick = onClick, modifier = modifier.height(64.dp), shape = RoundedCornerShape(16.dp), color = Color(0xFF140F0F)) {
@@ -346,60 +340,29 @@ private fun LanguageButton(text: String, onClick: () -> Unit, modifier: Modifier
 }
 
 @Composable
-private fun MicButton(onClick: () -> Unit, isRecording: Boolean, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.size(100.dp).background(if (isRecording) Color.Red else Color(0xFFF2B8B5), CircleShape).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic, contentDescription = "Mic", tint = if (isRecording) Color.White else Color(0xFF601410), modifier = Modifier.size(36.dp))
-    }
-}
-
-@Composable
-private fun HistoryCard(entry: TranslationHistoryEntity, isExpanded: Boolean, onToggleExpand: () -> Unit, onFavoriteToggle: () -> Unit, onDelete: () -> Unit, onRestore: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onToggleExpand() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1818))
+private fun MicButton(onClick: () -> Unit,
+                      isRecording: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = Modifier
+            .size(180.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${entry.sourceLangName} → ${entry.targetLangName}", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-                IconButton(onClick = onFavoriteToggle, modifier = Modifier.size(24.dp)) {
-                    Icon(if (entry.isFavorite) Icons.Default.Star else Icons.Default.StarBorder, contentDescription = null, tint = if (entry.isFavorite) Color.Yellow else Color.Gray, modifier = Modifier.size(16.dp))
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(entry.sourceText, color = Color.White, style = MaterialTheme.typography.bodyLarge, maxLines = if (isExpanded) 10 else 2, overflow = TextOverflow.Ellipsis)
-            if (isExpanded) {
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = Color.White.copy(0.1f))
-                Spacer(Modifier.height(8.dp))
-                Text(entry.translatedText, color = Color(0xFFF2B8B5), style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onRestore, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(0.1f))) { Text("Reuse", color = Color.White) }
-                    Button(onClick = onDelete, colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.1f))) { Text("Delete", color = Color.Red) }
-                }
-            }
+        if (isRecording) {
+            PulseAnimation()
         }
-    }
-}
 
-@Composable
-private fun PackCard(pack: LanguagePackEntity, isDownloading: Boolean, onDownload: () -> Unit, onDelete: () -> Unit) {
-    val infiniteTransition = rememberInfiniteTransition(label = "spin")
-    val rotation by infiniteTransition.animateFloat(initialValue = 0f, targetValue = 360f, animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "rotation")
-
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1818))) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(pack.displayName, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(if (pack.status == PackStatus.DOWNLOADED) "Offline Ready" else "Not Downloaded", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-            }
-            if (isDownloading) {
-                Icon(Icons.Default.Sync, contentDescription = null, tint = Color(0xFFF2B8B5), modifier = Modifier.rotate(rotation))
-            } else if (pack.status == PackStatus.DOWNLOADED) {
-                IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Color.Red.copy(0.7f)) }
-            } else {
-                IconButton(onClick = onDownload) { Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color(0xFFF2B8B5)) }
-            }
+        LargeFloatingActionButton(
+            onClick = onClick,
+            shape = CircleShape,
+            containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            contentColor = Color.White,
+            modifier = Modifier.size(90.dp)
+        ) {
+            Icon(
+                imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                modifier = Modifier.size(40.dp)
+            )
         }
     }
 }

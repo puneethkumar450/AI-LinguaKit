@@ -52,7 +52,6 @@ class ModelDownloadManager {
     ): String {
         val translator = getTranslator(sourceLang, targetLang)
         val readyTask = ensureModelReady(translator, sourceLang, targetLang)
-        
         return suspendCancellableCoroutine { cont ->
             if (readyTask.isSuccessful) {
                 // Fast path: model is already ready
