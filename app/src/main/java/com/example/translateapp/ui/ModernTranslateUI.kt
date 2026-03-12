@@ -140,21 +140,20 @@ private fun MainTranslateView(
     onPacksClick: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color(0xFF140F0F),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("LinguaKit", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { Text("LinguaKit", color = Color.Black, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onHistoryClick) {
                         BadgedBox(badge = { if (historyCount > 0) Badge { Text(historyCount.coerceAtMost(99).toString()) } }) {
-                            Icon(Icons.Default.History, contentDescription = "History", tint = Color.White)
+                            Icon(Icons.Default.History, contentDescription = "History", tint = Color.Black)
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = onPacksClick) {
                         BadgedBox(badge = { if (packsNotification > 0) Badge { Text(packsNotification.coerceAtMost(99).toString()) } }) {
-                            Icon(Icons.Default.Download, contentDescription = "Language Packs", tint = Color.White)
+                            Icon(Icons.Default.Download, contentDescription = "Language Packs", tint = Color.Black)
                         }
                     }
                 },
@@ -179,11 +178,11 @@ private fun MainTranslateView(
                     value = input,
                     onValueChange = onInputChange,
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = TextStyle(color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Normal),
+                    textStyle = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Normal),
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.enter_text_placeholder),
-                            style = TextStyle(color = Color.White.copy(alpha = 0.3f), fontSize = 32.sp)
+                            style = TextStyle(color = Color.Black.copy(alpha = 0.3f), fontSize = 32.sp)
                         )
                     },
                     colors = TextFieldDefaults.colors(
@@ -191,7 +190,7 @@ private fun MainTranslateView(
                         unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.White
+                        cursorColor = Color.Black
                     )
                 )
 
@@ -199,7 +198,7 @@ private fun MainTranslateView(
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                         color = Color(0xFFF2B8B5),
-                        trackColor = Color.White.copy(alpha = 0.1f)
+                        trackColor = Color.Black.copy(alpha = 0.1f)
                     )
                 }
 
@@ -214,7 +213,7 @@ private fun MainTranslateView(
 
                 if (translatedText.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(32.dp))
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
                     Spacer(modifier = Modifier.height(32.dp))
                     Text(
                         text = translatedText,
@@ -227,13 +226,13 @@ private fun MainTranslateView(
             // Bottom section
             Surface(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
-                color = Color(0xFF1E1818)
+                color = Color.Blue.copy(0.05f)
             ) {
                 Column(
                     modifier = Modifier.padding(top = 12.dp, bottom = 48.dp, start = 24.dp, end = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(modifier = Modifier.width(32.dp).height(4.dp).background(Color.White.copy(alpha = 0.15f), CircleShape))
+                    Box(modifier = Modifier.width(32.dp).height(4.dp).background(Color.Black.copy(alpha = 0.15f), CircleShape))
                     Spacer(modifier = Modifier.height(32.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -242,7 +241,7 @@ private fun MainTranslateView(
                     ) {
                         LanguageButton(text = sourceLanguage, onClick = onSourceLangClick, modifier = Modifier.weight(1f))
                         IconButton(onClick = onLanguageSwap, modifier = Modifier.padding(horizontal = 8.dp)) {
-                            Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = Color.Black.copy(alpha = 0.7f), modifier = Modifier.size(24.dp))
                         }
                         LanguageButton(text = targetLanguage, onClick = onTargetLangClick, modifier = Modifier.weight(1f))
                     }
@@ -265,16 +264,14 @@ fun LanguagePickerScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color(0xFF140F0F),
         topBar = {
             TopAppBar(
-                title = { Text(title, color = Color.White) },
+                title = { Text(title, color = Color.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF140F0F))
             )
         }
     ) { padding ->
@@ -296,13 +293,13 @@ fun LanguagePickerScreen(
                 placeholder = { Text("Search languages...", color = Color.Gray) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFF1E1818),
-                    unfocusedContainerColor = Color(0xFF1E1818),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedContainerColor = Color.Gray.copy(0.3f),
+                    unfocusedContainerColor = Color.Gray.copy(0.3f),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = Color.White
+                    cursorColor = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
@@ -319,9 +316,9 @@ fun LanguagePickerScreen(
                 }
 
                 item {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp),
+                    HorizontalDivider(modifier = Modifier,
                         thickness = 3.dp,
-                        color = Color.Blue.copy(alpha = 0.02f))
+                        color = Color.Blue.copy(alpha = 0.04f))
                 }
 
                 if (others.isNotEmpty()) {
@@ -358,26 +355,26 @@ private fun LanguageItem(
         headlineContent = {
             Text(
                 text = lang.displayName,
-                fontWeight = if (lang.code == selected.code) FontWeight.Bold else FontWeight.Normal,
-                color = if(isDownloaded) Color.White else Color.Gray
+                fontWeight = if (lang.code == selected.code) FontWeight.SemiBold else FontWeight.Normal,
+                color = if(isDownloaded) Color.Black else Color.Gray
             )
         },
         trailingContent = {
             if (lang.code == selected.code) {
-                Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color(0xFFF2B8B5))
+                Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.Blue)
             }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clickable { onSelect(lang) }
     )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.05f))
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Black.copy(alpha = 0.05f))
 }
 
 @Composable
 private fun LanguageButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, modifier = modifier.height(64.dp), shape = RoundedCornerShape(16.dp), color = Color(0xFF140F0F)) {
+    Surface(onClick = onClick, modifier = modifier.height(64.dp), shape = RoundedCornerShape(16.dp)) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text = text, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(text = text, color = Color.Black, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         }
     }
 }
@@ -398,7 +395,6 @@ private fun MicButton(onClick: () -> Unit,
             onClick = onClick,
             shape = CircleShape,
             containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
             modifier = Modifier.size(90.dp)
         ) {
             Icon(
