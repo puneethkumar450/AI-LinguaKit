@@ -21,6 +21,18 @@ class ModelDownloadManager {
     private val translatorCache = ConcurrentHashMap<String, Translator>()
     private val modelReadyTasks = ConcurrentHashMap<String, Task<Void>>()
 
+    // Warms up the translator by running a dummy translation
+    // so the real translation is instant
+    suspend fun warmUp(sourceLang: String, targetLang: String) {
+        try {
+            val translator = getTranslator(sourceLang, targetLang)
+            ensureModelReady(translator, sourceLang, targetLang)
+            translator.translate("hello") // lightweight dummy — just loads the model into memory
+        } catch (e: Exception) {
+            Log.w(TAG, "Warmup failed for $sourceLang->$targetLang, will retry on real translate", e)
+        }
+    }
+
     private fun getTranslator(sourceLang: String, targetLang: String): Translator {
         val key = "$sourceLang-$targetLang"
         return translatorCache.getOrPut(key) {
@@ -52,6 +64,7 @@ class ModelDownloadManager {
     ): String {
         val translator = getTranslator(sourceLang, targetLang)
         val readyTask = ensureModelReady(translator, sourceLang, targetLang)
+
         return suspendCancellableCoroutine { cont ->
             if (readyTask.isSuccessful) {
                 // Fast path: model is already ready

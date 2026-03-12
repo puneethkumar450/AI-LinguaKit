@@ -14,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
+import com.example.translateapp.data.PackStatus
 import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.service.ConnectivityHelper
 import com.example.translateapp.service.LanguagePackRepository
@@ -25,6 +26,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,6 +79,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val packDao    = db.languagePackDao()
     private val downloader = ModelDownloadManager()
     val packRepo           = LanguagePackRepository(packDao, downloader, viewModelScope)
+
+    // ── Plan Management ───────────────────────────────────────────────────────
+    private val _isPremium = MutableStateFlow(false)
+    val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
+
+    fun togglePremium() {
+        _isPremium.value = !_isPremium.value
+    }
 
     // ── One-shot UI messages (Snackbar) ───────────────────────────────────────
     private val _uiMessage = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -184,6 +194,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         packRepo.initAsync()
         initTts(application)
         initSpeechRecognizer(application)
+        
+        // Warm up only if already downloaded or if premium
+        viewModelScope.launch {
+            val enReady = packDao.getByCode(TranslateLanguage.ENGLISH)?.status == PackStatus.DOWNLOADED
+            val esReady = packDao.getByCode(SUPPORTED_LANGUAGES[1].mlKitCode)?.status == PackStatus.DOWNLOADED
+            if (_isPremium.value || (enReady && esReady)) {
+                downloader.warmUp(TranslateLanguage.ENGLISH, SUPPORTED_LANGUAGES[1].mlKitCode)
+            }
+        }
     }
 
     private fun initTts(application: Application) {
@@ -220,14 +239,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             handleSpeechResult(text)
                         }
                     }
-                    override fun onPartialResults(partialResults: Bundle?) {
-                       /* val partial = partialResults
-                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            ?.firstOrNull() ?: return
-
-                        // Show live feedback in the input field while recording
-                        _translateInput.value = partial*/
-                    }
+                    override fun onPartialResults(partialResults: Bundle?) { }
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
@@ -310,18 +322,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translatedText.value = ""
         _translateError.value = null
         _translateSource.value = TranslateSource.NONE
+        _detectedLanguage.value = null
     }
 
     fun setTranslateSourceLang(lang: LanguageOption) {
         _translateSourceLang.value = lang
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
+        _detectedLanguage.value = null
+        
+        if (lang != AUTO_DETECT_OPTION) {
+            viewModelScope.launch {
+                val srcReady = packDao.getByCode(lang.mlKitCode)?.status == PackStatus.DOWNLOADED
+                val tgtReady = packDao.getByCode(_translateTargetLang.value.mlKitCode)?.status == PackStatus.DOWNLOADED
+                if (_isPremium.value || (srcReady && tgtReady)) {
+                    downloader.warmUp(lang.mlKitCode, _translateTargetLang.value.mlKitCode)
+                }
+            }
+        }
     }
 
     fun setTranslateTargetLang(lang: LanguageOption) {
         _translateTargetLang.value = lang
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
+        
+        viewModelScope.launch {
+            val src = _translateSourceLang.value
+            val srcCode = if (src == AUTO_DETECT_OPTION) TranslateLanguage.ENGLISH else src.mlKitCode
+            val srcReady = packDao.getByCode(srcCode)?.status == PackStatus.DOWNLOADED
+            val tgtReady = packDao.getByCode(lang.mlKitCode)?.status == PackStatus.DOWNLOADED
+            
+            if (_isPremium.value || (srcReady && tgtReady)) {
+                downloader.warmUp(srcCode, lang.mlKitCode)
+            }
+        }
     }
 
     fun swapTranslateLanguages() {
@@ -339,6 +374,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var translateJob: Job? = null
     fun translate() {
         val text = _translateInput.value.trim()
         if (text.isBlank()) {
@@ -346,7 +382,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        viewModelScope.launch {
+        translateJob?.cancel()
+        translateJob = viewModelScope.launch {
             _translateLoading.value = true
             _translateError.value   = null
             _translateSource.value  = TranslateSource.NONE
@@ -381,17 +418,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
                 val tgt = _translateTargetLang.value
 
-               // val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
+                val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
                 val isOnline   = ConnectivityHelper.isOnline(getApplication())
 
                 when {
-                   /* packsReady -> {
+                    packsReady -> {
                         val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
                         _translateSource.value = TranslateSource.OFFLINE
                         saveHistory(text, result, src, tgt)
-                    }*/
+                    }
                     isOnline -> {
+                        // Plan limit check: if premium, no limit.
+                        // If free, must have room for BOTH models if they aren't already downloaded.
+                        if (!_isPremium.value) {
+                            val downloaded = allPacks.value.filter { it.status == PackStatus.DOWNLOADED }.map { it.mlKitCode }.toSet()
+                            val needed = mutableListOf<String>()
+                            if (!downloaded.contains(src.mlKitCode)) needed.add(src.mlKitCode)
+                            if (!downloaded.contains(tgt.mlKitCode)) needed.add(tgt.mlKitCode)
+                            
+                            if (downloaded.size + needed.size > 2) {
+                                _translateError.value = "Free plan limit: Max 2 offline models. Delete a pack to use ${src.displayName} or ${tgt.displayName}."
+                                return@launch
+                            }
+                        }
+
                         val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
                         _translatedText.value  = result
                         _translateSource.value = TranslateSource.ONLINE
@@ -436,13 +487,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
         viewModelScope.launch {
-            _downloadingPacks.value += mlKitCode
+            val downloadedCount = allPacks.value.count { it.status == PackStatus.DOWNLOADED }
+            if (!_isPremium.value && downloadedCount >= 2) {
+                _uiMessage.emit("Free plan limit: Max 2 offline models.")
+                return@launch
+            }
+
+            _downloadingPacks.value = _downloadingPacks.value + mlKitCode
             try {
                 packRepo.downloadPack(mlKitCode, requireWifi)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
                 _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
+            } catch (e: Exception) {
+                _uiMessage.emit("Download failed: ${e.message}")
             } finally {
-                _downloadingPacks.value -= mlKitCode
+                _downloadingPacks.value = _downloadingPacks.value - mlKitCode
             }
         }
     }

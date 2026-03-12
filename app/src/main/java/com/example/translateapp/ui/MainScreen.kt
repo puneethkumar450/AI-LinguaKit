@@ -5,12 +5,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
 
 @Composable
 fun MainScreen(vm: AppViewModel = viewModel()) {
     val isLiveCameraMode by vm.isLiveCameraMode.collectAsState()
     val navController = rememberNavController()
+    
+    val allPacks by vm.allPacks.collectAsState()
+    val downloadedCodes = remember(allPacks) {
+        allPacks.filter { it.status == PackStatus.DOWNLOADED }.map { it.mlKitCode }.toSet()
+    }
 
     if (isLiveCameraMode) {
         LiveTranslationScreen(vm = vm, onDismiss = { vm.setLiveCameraMode(false) })
@@ -43,6 +49,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     title = "Translate from",
                     selected = vm.translateSourceLang.collectAsState().value,
                     options = listOf(com.example.translateapp.viewmodel.AUTO_DETECT_OPTION) + com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES,
+                    downloadedCodes = downloadedCodes,
                     onSelect = { 
                         vm.setTranslateSourceLang(it)
                         navController.popBackStack()
@@ -55,6 +62,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                     title = "Translate to",
                     selected = vm.translateTargetLang.collectAsState().value,
                     options = com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES,
+                    downloadedCodes = downloadedCodes,
                     onSelect = { 
                         vm.setTranslateTargetLang(it)
                         navController.popBackStack()

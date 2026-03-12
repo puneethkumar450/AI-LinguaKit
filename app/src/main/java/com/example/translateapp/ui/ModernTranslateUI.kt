@@ -67,9 +67,7 @@ fun ModernTranslateScreen(vm: AppViewModel,
     val historyItems by vm.allHistory.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
     val downloading by vm.downloadingPacks.collectAsState()
-    val notDownloadedCount by remember(allPacks) {
-        mutableStateOf(allPacks.count { it.status != PackStatus.DOWNLOADED })
-    }
+    val notDownloadedCount = allPacks.count { it.status != PackStatus.DOWNLOADED }
 
     val recordAudioPermissionState = rememberPermissionState(
         android.Manifest.permission.RECORD_AUDIO
@@ -262,6 +260,7 @@ fun LanguagePickerScreen(
     title: String,
     selected: LanguageOption,
     options: List<LanguageOption>,
+    downloadedCodes: Set<String> = emptySet(),
     onSelect: (LanguageOption) -> Unit,
     onBack: () -> Unit
 ) {
@@ -285,6 +284,10 @@ fun LanguagePickerScreen(
             else options.filter { it.displayName.contains(searchQuery, ignoreCase = true) }
         }
 
+        val (downloaded, others) = remember(filteredOptions, downloadedCodes) {
+            filteredOptions.partition { downloadedCodes.contains(it.mlKitCode) || it == AUTO_DETECT_OPTION }
+        }
+
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             TextField(
                 value = searchQuery,
@@ -306,28 +309,68 @@ fun LanguagePickerScreen(
             )
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(filteredOptions) { lang ->
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = lang.displayName,
-                                fontWeight = if (lang.code == selected.code) FontWeight.Bold else FontWeight.Normal,
-                                color = Color.White
-                            )
-                        },
-                        trailingContent = {
-                            if (lang.code == selected.code) {
-                                Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color(0xFFF2B8B5))
-                            }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable { onSelect(lang) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.05f))
+                if (downloaded.isNotEmpty()) {
+                    item {
+                        SectionHeaderTitle("Available")
+                    }
+                    items(downloaded) { lang ->
+                        LanguageItem(lang, selected, true, onSelect )
+                    }
+                }
+
+                item {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 3.dp,
+                        color = Color.Blue.copy(alpha = 0.02f))
+                }
+
+                if (others.isNotEmpty()) {
+                    item {
+                        SectionHeaderTitle("All Languages")
+                    }
+                    items(others) { lang ->
+                        LanguageItem(lang, selected, false, onSelect)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeaderTitle(text: String) {
+    Text(
+        text = text,
+        color = Color.Gray,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun LanguageItem(
+    lang: LanguageOption,
+    selected: LanguageOption,
+    isDownloaded: Boolean,
+    onSelect: (LanguageOption) -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = lang.displayName,
+                fontWeight = if (lang.code == selected.code) FontWeight.Bold else FontWeight.Normal,
+                color = if(isDownloaded) Color.White else Color.Gray
+            )
+        },
+        trailingContent = {
+            if (lang.code == selected.code) {
+                Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color(0xFFF2B8B5))
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { onSelect(lang) }
+    )
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.05f))
 }
 
 @Composable
