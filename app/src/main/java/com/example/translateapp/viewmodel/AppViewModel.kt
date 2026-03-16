@@ -1,6 +1,7 @@
 package com.example.translateapp.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -73,12 +74,34 @@ enum class HistoryFilter { ALL, FAVORITES }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val prefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
     // ── Infrastructure ────────────────────────────────────────────────────────
     private val db         = AppDatabase.getInstance(application)
     private val historyDao = db.historyDao()
     private val packDao    = db.languagePackDao()
     private val downloader = ModelDownloadManager()
     val packRepo           = LanguagePackRepository(packDao, downloader, viewModelScope)
+
+    // ── First Run Logic ───────────────────────────────────────────────────────
+    private val _isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
+    val isFirstRun: StateFlow<Boolean> = _isFirstRun.asStateFlow()
+
+    fun completeFirstRun(source: LanguageOption, target: LanguageOption) {
+        prefs.edit().apply {
+            putBoolean("is_first_run", false)
+            putString("source_lang_code", source.code)
+            putString("target_lang_code", target.code)
+            apply()
+        }
+        _isFirstRun.value = false
+        _translateSourceLang.value = source
+        _translateTargetLang.value = target
+
+        viewModelScope.launch {
+            downloader.warmUp(source.mlKitCode, target.mlKitCode)
+        }
+    }
 
     // ── Plan Management ───────────────────────────────────────────────────────
     private val _isPremium = MutableStateFlow(false)
@@ -120,10 +143,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _translatedText     = MutableStateFlow("")
     val translatedText: StateFlow<String> = _translatedText.asStateFlow()
 
-    private val _translateSourceLang = MutableStateFlow(AUTO_DETECT_OPTION)
+    private val _translateSourceLang = MutableStateFlow(
+        SUPPORTED_LANGUAGES.find { it.code == prefs.getString("source_lang_code", "en") } ?: SUPPORTED_LANGUAGES[0]
+    )
     val translateSourceLang: StateFlow<LanguageOption> = _translateSourceLang.asStateFlow()
 
-    private val _translateTargetLang = MutableStateFlow(SUPPORTED_LANGUAGES[1])
+    private val _translateTargetLang = MutableStateFlow(
+        SUPPORTED_LANGUAGES.find { it.code == prefs.getString("target_lang_code", "es") } ?: SUPPORTED_LANGUAGES[1]
+    )
     val translateTargetLang: StateFlow<LanguageOption> = _translateTargetLang.asStateFlow()
 
     private val _translateLoading   = MutableStateFlow(false)
@@ -173,9 +200,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _ocrError           = MutableStateFlow<String?>(null)
     val ocrError: StateFlow<String?> = _ocrError.asStateFlow()
 
-    private val _ocrSelectedBitmap  = MutableStateFlow<Bitmap?>(null)
-    val ocrSelectedBitmap: StateFlow<Bitmap?> = _ocrSelectedBitmap.asStateFlow()
-
     private val _ocrTtsLanguage     = MutableStateFlow(SUPPORTED_LANGUAGES[0])
     val ocrTtsLanguage: StateFlow<LanguageOption> = _ocrTtsLanguage.asStateFlow()
 
@@ -192,17 +216,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         packRepo.initAsync()
-        initTts(application)
-        initSpeechRecognizer(application)
+        //initTts(application)
+       // initSpeechRecognizer(application)
         
         // Warm up only if already downloaded or if premium
-        viewModelScope.launch {
+        /*viewModelScope.launch {
             val enReady = packDao.getByCode(TranslateLanguage.ENGLISH)?.status == PackStatus.DOWNLOADED
             val esReady = packDao.getByCode(SUPPORTED_LANGUAGES[1].mlKitCode)?.status == PackStatus.DOWNLOADED
             if (_isPremium.value || (enReady && esReady)) {
                 downloader.warmUp(TranslateLanguage.ENGLISH, SUPPORTED_LANGUAGES[1].mlKitCode)
             }
-        }
+        }*/
     }
 
     private fun initTts(application: Application) {
@@ -331,6 +355,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translateSource.value = TranslateSource.NONE
         _detectedLanguage.value = null
         
+        prefs.edit().putString("source_lang_code", lang.code).apply()
+
         if (lang != AUTO_DETECT_OPTION) {
             viewModelScope.launch {
                 val srcReady = packDao.getByCode(lang.mlKitCode)?.status == PackStatus.DOWNLOADED
@@ -347,6 +373,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
         
+        prefs.edit().putString("target_lang_code", lang.code).apply()
+
         viewModelScope.launch {
             val src = _translateSourceLang.value
             val srcCode = if (src == AUTO_DETECT_OPTION) TranslateLanguage.ENGLISH else src.mlKitCode
@@ -364,8 +392,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val tgt = _translateTargetLang.value
         if (src == AUTO_DETECT_OPTION) return // Cannot swap if source is auto-detect
         
-        _translateSourceLang.value = tgt
-        _translateTargetLang.value = src
+        setTranslateSourceLang(tgt)
+        setTranslateTargetLang(src)
+
         val input  = _translateInput.value
         val output = _translatedText.value
         if (output.isNotBlank()) {
@@ -538,9 +567,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ── OCR actions ───────────────────────────────────────────────────────────
 
     fun setOcrBitmap(bitmap: Bitmap) {
-        _ocrSelectedBitmap.value = bitmap
-        _ocrText.value = ""
-        _ocrTranslatedText.value = ""
         recognizeText(bitmap)
     }
 
@@ -583,7 +609,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearOcr() { 
-        _ocrSelectedBitmap.value = null
         _ocrText.value = ""
         _ocrTranslatedText.value = ""
     }

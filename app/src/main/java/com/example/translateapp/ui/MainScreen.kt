@@ -10,6 +10,7 @@ import com.example.translateapp.viewmodel.AppViewModel
 
 @Composable
 fun MainScreen(vm: AppViewModel = viewModel()) {
+    val isFirstRun by vm.isFirstRun.collectAsState()
     val isLiveCameraMode by vm.isLiveCameraMode.collectAsState()
     val navController = rememberNavController()
     
@@ -18,8 +19,12 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
         allPacks.filter { it.status == PackStatus.DOWNLOADED }.map { it.mlKitCode }.toSet()
     }
 
-    if (isLiveCameraMode) {
-        LiveTranslationScreen(vm = vm, onDismiss = { vm.setLiveCameraMode(false) })
+    if (isFirstRun) {
+        OneTimeLanguagePicker(
+            onLanguagesSelected = { source, target ->
+                vm.completeFirstRun(source, target)
+            }
+        )
     } else {
         NavHost(navController = navController, startDestination = "translate") {
             composable("translate") {
