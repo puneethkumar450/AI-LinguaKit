@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">داكن</string>
     <string name="app_language_title">لغة التطبيق</string>
     <string name="app_language_subtitle">اختر اللغة المستخدمة في واجهة التطبيق.</string>
+
+    <string name="manage_plan">إدارة الخطة</string>
+    <string name="language_packs_title">حزم اللغات</string>
+    <string name="language_packs_subtitle">إدارة اللغات التي تم تنزيلها للعمل دون اتصال بالإنترنت.</string>
+    <string name="plan_usage_title">الخطة والاستخدام</string>
+    <string name="words_left_template">تبقى %1$d كلمة في الخطة المجانية</string>
+    <string name="downloaded_languages_template">%1$d لغة تم تنزيلها</string>
+    <string name="swap_translation_pair">تبديل الإدخال والنتيجة</string>
+    <string name="language_change_title">تغيير لغة التطبيق</string>
+
+    <string name="history_title">السجل</string>
+    <string name="history_search_placeholder">البحث في السجل…</string>
+    <string name="history_search_clear_desc">مسح البحث</string>
+    <string name="history_filter_all_template">الكل (%1$d)</string>
+    <string name="history_filter_starred_template">المميزة بنجمة (%1$d)</string>
+    <string name="history_clear_all_desc">مسح السجل</string>
+    <string name="history_empty_search_template">لا توجد نتائج لـ \"%1$s\"</string>
+    <string name="history_empty_starred">لا توجد ترجمات مميزة بنجمة بعد</string>
+    <string name="history_empty_all">لا توجد ترجمات بعد.\nقم بترجمة شيء لرؤيته هنا.</string>
+    <string name="history_clear_dialog_title">مسح السجل</string>
+    <string name="history_clear_dialog_message">هل تريد إزالة جميع الترجمات غير المميزة بنجمة؟ سيتم الاحتفاظ بالعناصر المميزة بنجمة.</string>
+    <string name="history_clear_confirm">مسح</string>
+    <string name="history_clear_cancel">إلغاء</string>
+    <string name="history_star_desc">تمييز بنجمة</string>
+    <string name="history_unstar_desc">إزالة النجمة</string>
 </resources>

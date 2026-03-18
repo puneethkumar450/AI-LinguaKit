@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -75,7 +73,10 @@ fun SettingsScreenUI(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Card(shape = RoundedCornerShape(18.dp)) {
+                Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors().copy(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             stringResource(R.string.theme_mode_title),
@@ -119,7 +120,11 @@ fun SettingsScreenUI(
             }
 
             item {
-                Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors()) {
+                Card(shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors().copy(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             stringResource(R.string.plan_usage_title),
@@ -137,68 +142,6 @@ fun SettingsScreenUI(
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(onClick = onOpenPlans, modifier = Modifier.fillMaxWidth()) {
                             Text(if (isPremium) stringResource(R.string.manage_plan) else stringResource(R.string.upgrade_now))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LanguageChangeScreenUI(
-    vm: AppViewModel,
-    onBack: () -> Unit
-) {
-    val appLanguageTag by vm.appLanguageTag.collectAsState()
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.language_change_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Text(
-                    stringResource(R.string.app_language_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            items(vm.supportedAppLanguages, key = { it.languageTag }) { option ->
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.setAppLanguage(option.languageTag) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = appLanguageTag == option.languageTag,
-                                onClick = { vm.setAppLanguage(option.languageTag) }
-                            )
-                            Text(option.displayName)
-                        }
-                        if (appLanguageTag == option.languageTag) {
-                            Icon(Icons.Default.Check, contentDescription = null)
                         }
                     }
                 }
@@ -229,7 +172,12 @@ private fun SettingsActionCard(
     subtitle: String,
     onClick: () -> Unit
 ) {
-    Card(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+    Card(shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors().copy(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor  = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
+        modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

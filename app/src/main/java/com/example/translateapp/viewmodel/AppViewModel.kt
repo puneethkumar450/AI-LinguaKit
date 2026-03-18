@@ -12,17 +12,18 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.data.TranslationHistoryEntity
-import com.example.translateapp.service.BillingRepository
-import com.example.translateapp.service.ConnectivityHelper
 import com.example.translateapp.service.AppLanguageOption
 import com.example.translateapp.service.AppSettingsManager
 import com.example.translateapp.service.AppThemeMode
+import com.example.translateapp.service.BillingRepository
+import com.example.translateapp.service.ConnectivityHelper
 import com.example.translateapp.service.LanguagePackRepository
 import com.example.translateapp.service.ModelDownloadManager
 import com.google.mlkit.nl.languageid.IdentifiedLanguage
@@ -224,11 +225,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun completeFirstRun(source: LanguageOption, target: LanguageOption) {
         val selected = listOf(source, target).distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT)
         persistFreeLanguages(selected)
-        prefs.edit()
-            .putBoolean(PREF_IS_FIRST_RUN, false)
-            .putString(PREF_SOURCE_LANG_CODE, source.code)
-            .putString(PREF_TARGET_LANG_CODE, target.code)
-            .apply()
+        prefs.edit {
+            putBoolean(PREF_IS_FIRST_RUN, false)
+                .putString(PREF_SOURCE_LANG_CODE, source.code)
+                .putString(PREF_TARGET_LANG_CODE, target.code)
+        }
 
         _isFirstRun.value = false
         _translateSourceLang.value = source
@@ -323,7 +324,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
         _detectedLanguage.value = null
-        prefs.edit().putString(PREF_SOURCE_LANG_CODE, safeLang.code).apply()
+        prefs.edit { putString(PREF_SOURCE_LANG_CODE, safeLang.code) }
 
         viewModelScope.launch {
             val tgt = _translateTargetLang.value
@@ -338,7 +339,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translateTargetLang.value = safeLang
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
-        prefs.edit().putString(PREF_TARGET_LANG_CODE, safeLang.code).apply()
+        prefs.edit { putString(PREF_TARGET_LANG_CODE, safeLang.code) }
 
         viewModelScope.launch {
             val src = _translateSourceLang.value
@@ -744,7 +745,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         text: String,
         result: String,
         src: LanguageOption,
-        tgt: LanguageOption
+        tgt: LanguageOption,
     ) {
         val existing = historyDao.findExactHistoryEntry(text, result, src.code, tgt.code)
         if (existing != null) {
@@ -841,16 +842,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (!isFreeLanguage(_translateTargetLang.value) || _translateTargetLang.value == _translateSourceLang.value) {
                 _translateTargetLang.value = chosen.getOrElse(1) { chosen.first() }
             }
-            prefs.edit()
-                .putString(PREF_SOURCE_LANG_CODE, _translateSourceLang.value.code)
-                .putString(PREF_TARGET_LANG_CODE, _translateTargetLang.value.code)
-                .apply()
+            prefs.edit {
+                putString(PREF_SOURCE_LANG_CODE, _translateSourceLang.value.code)
+                    .putString(PREF_TARGET_LANG_CODE, _translateTargetLang.value.code)
+            }
         }
     }
 
     private fun persistFreeLanguages(languages: List<LanguageOption>) {
-        val codes = languages.distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT).map { it.code }.toSet()
-        prefs.edit().putStringSet(PREF_FREE_LANGUAGE_CODES, codes).apply()
+        val codes = languages.distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT).map { it.code }
+            .toSet()
+        prefs.edit { putStringSet(PREF_FREE_LANGUAGE_CODES, codes)}
         _freePlanLanguages.value = codes.mapNotNull { code ->
             SUPPORTED_LANGUAGES.find { it.code == code }
         }.ifEmpty { SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT) }

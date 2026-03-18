@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">Sombre</string>
     <string name="app_language_title">Langue de l’application</string>
     <string name="app_language_subtitle">Choisissez la langue utilisée par l’interface de l’application.</string>
+
+    <string name="manage_plan">Gérer le forfait</string>
+    <string name="language_packs_title">Packs de langue</string>
+    <string name="language_packs_subtitle">Gérer les langues téléchargées hors connexion.</string>
+    <string name="plan_usage_title">Forfait et utilisation</string>
+    <string name="words_left_template">%1$d mots restants dans le forfait gratuit</string>
+    <string name="downloaded_languages_template">%1$d langues téléchargées</string>
+    <string name="swap_translation_pair">Inverser la saisie et le résultat</string>
+    <string name="language_change_title">Changer la langue de l’application</string>
+
+    <string name="history_title">Historique</string>
+    <string name="history_search_placeholder">Rechercher dans l’historique…</string>
+    <string name="history_search_clear_desc">Effacer la recherche</string>
+    <string name="history_filter_all_template">Tout (%1$d)</string>
+    <string name="history_filter_starred_template">Favoris (%1$d)</string>
+    <string name="history_clear_all_desc">Effacer l’historique</string>
+    <string name="history_empty_search_template">Aucun résultat pour « %1$s »</string>
+    <string name="history_empty_starred">Aucune traduction favorite pour le moment</string>
+    <string name="history_empty_all">Aucune traduction pour le moment.\nTraduisez quelque chose pour le voir ici.</string>
+    <string name="history_clear_dialog_title">Effacer l’historique</string>
+    <string name="history_clear_dialog_message">Supprimer toutes les traductions non favorites ? Les éléments favoris seront conservés.</string>
+    <string name="history_clear_confirm">Effacer</string>
+    <string name="history_clear_cancel">Annuler</string>
+    <string name="history_star_desc">Ajouter aux favoris</string>
+    <string name="history_unstar_desc">Retirer des favoris</string>
 </resources>

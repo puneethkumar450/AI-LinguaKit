@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">Oscuro</string>
     <string name="app_language_title">Idioma de la app</string>
     <string name="app_language_subtitle">Elige el idioma usado por la interfaz de la aplicación.</string>
+
+    <string name="manage_plan">Gestionar plan</string>
+    <string name="language_packs_title">Paquetes de idiomas</string>
+    <string name="language_packs_subtitle">Gestionar idiomas descargados sin conexión.</string>
+    <string name="plan_usage_title">Plan y uso</string>
+    <string name="words_left_template">%1$d palabras restantes en el plan gratuito</string>
+    <string name="downloaded_languages_template">%1$d idiomas descargados</string>
+    <string name="swap_translation_pair">Intercambiar entrada y resultado</string>
+    <string name="language_change_title">Cambiar idioma de la aplicación</string>
+
+    <string name="history_title">Historial</string>
+    <string name="history_search_placeholder">Buscar en el historial…</string>
+    <string name="history_search_clear_desc">Borrar búsqueda</string>
+    <string name="history_filter_all_template">Todos (%1$d)</string>
+    <string name="history_filter_starred_template">Destacados (%1$d)</string>
+    <string name="history_clear_all_desc">Borrar historial</string>
+    <string name="history_empty_search_template">No hay resultados para \"%1$s\"</string>
+    <string name="history_empty_starred">Aún no hay traducciones destacadas</string>
+    <string name="history_empty_all">Aún no hay traducciones.\nTraduce algo para verlo aquí.</string>
+    <string name="history_clear_dialog_title">Borrar historial</string>
+    <string name="history_clear_dialog_message">¿Eliminar todas las traducciones no destacadas? Se mantendrán los elementos destacados.</string>
+    <string name="history_clear_confirm">Borrar</string>
+    <string name="history_clear_cancel">Cancelar</string>
+    <string name="history_star_desc">Destacar</string>
+    <string name="history_unstar_desc">Quitar destacado</string>
 </resources>

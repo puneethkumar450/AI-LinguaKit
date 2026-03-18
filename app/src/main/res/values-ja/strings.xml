@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">ダーク</string>
     <string name="app_language_title">アプリの言語</string>
     <string name="app_language_subtitle">アプリ画面で使用する言語を選択します。</string>
+
+    <string name="manage_plan">プランを管理</string>
+    <string name="language_packs_title">言語パック</string>
+    <string name="language_packs_subtitle">ダウンロードしたオフライン言語を管理します。</string>
+    <string name="plan_usage_title">プランと使用状況</string>
+    <string name="words_left_template">無料プランの残り翻訳語数: %1$d語</string>
+    <string name="downloaded_languages_template">ダウンロード済みの言語: %1$d</string>
+    <string name="swap_translation_pair">入力と結果を入れ替える</string>
+    <string name="language_change_title">アプリの言語を変更</string>
+
+    <string name="history_title">履歴</string>
+    <string name="history_search_placeholder">履歴を検索…</string>
+    <string name="history_search_clear_desc">検索をクリア</string>
+    <string name="history_filter_all_template">すべて (%1$d)</string>
+    <string name="history_filter_starred_template">お気に入り (%1$d)</string>
+    <string name="history_clear_all_desc">履歴を消去</string>
+    <string name="history_empty_search_template">\"%1$s\" の結果は見つかりませんでした</string>
+    <string name="history_empty_starred">お気に入りの翻訳はまだありません</string>
+    <string name="history_empty_all">翻訳履歴はまだありません。\n翻訳するとここに表示されます。</string>
+    <string name="history_clear_dialog_title">履歴を消去</string>
+    <string name="history_clear_dialog_message">お気に入り以外のすべての翻訳を削除しますか？お気に入りは保持されます。</string>
+    <string name="history_clear_confirm">消去</string>
+    <string name="history_clear_cancel">キャンセル</string>
+    <string name="history_star_desc">お気に入りに追加</string>
+    <string name="history_unstar_desc">お気に入りから削除</string>
 </resources>

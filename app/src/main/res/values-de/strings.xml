@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">Dunkel</string>
     <string name="app_language_title">App-Sprache</string>
     <string name="app_language_subtitle">Wähle die Sprache der App-Oberfläche.</string>
+
+    <string name="manage_plan">Tarif verwalten</string>
+    <string name="language_packs_title">Sprachpakete</string>
+    <string name="language_packs_subtitle">Heruntergeladene Offline-Sprachen verwalten.</string>
+    <string name="plan_usage_title">Tarif und Nutzung</string>
+    <string name="words_left_template">%1$d Wörter im kostenlosen Tarif übrig</string>
+    <string name="downloaded_languages_template">%1$d heruntergeladene Sprachen</string>
+    <string name="swap_translation_pair">Eingabe und Ergebnis tauschen</string>
+    <string name="language_change_title">App-Sprache ändern</string>
+
+    <string name="history_title">Verlauf</string>
+    <string name="history_search_placeholder">Verlauf durchsuchen…</string>
+    <string name="history_search_clear_desc">Suche löschen</string>
+    <string name="history_filter_all_template">Alle (%1$d)</string>
+    <string name="history_filter_starred_template">Favoriten (%1$d)</string>
+    <string name="history_clear_all_desc">Verlauf löschen</string>
+    <string name="history_empty_search_template">Keine Ergebnisse für \"%1$s\"</string>
+    <string name="history_empty_starred">Noch keine markierten Übersetzungen</string>
+    <string name="history_empty_all">Noch keine Übersetzungen.\nÜbersetze etwas, um es hier zu sehen.</string>
+    <string name="history_clear_dialog_title">Verlauf löschen</string>
+    <string name="history_clear_dialog_message">Alle nicht markierten Übersetzungen entfernen? Favoriten bleiben erhalten.</string>
+    <string name="history_clear_confirm">Löschen</string>
+    <string name="history_clear_cancel">Abbrechen</string>
+    <string name="history_star_desc">Markieren</string>
+    <string name="history_unstar_desc">Markierung entfernen</string>
 </resources>

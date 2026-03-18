@@ -9,26 +9,71 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.translateapp.R
 import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.HistoryFilter
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -52,142 +97,167 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-
-        // ── Search bar ───────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { vm.setHistorySearchQuery(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Search history…") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { vm.setHistorySearchQuery("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear search")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.history_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back))
                     }
                 }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // ── Filter chips + clear button ──────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = filter == HistoryFilter.ALL,
-                    onClick = { vm.setHistoryFilter(HistoryFilter.ALL) },
-                    label = { Text("All (${allHistory.size})") },
-                    leadingIcon = if (filter == HistoryFilter.ALL) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    } else null
-                )
-                FilterChip(
-                    selected = filter == HistoryFilter.FAVORITES,
-                    onClick = { vm.setHistoryFilter(HistoryFilter.FAVORITES) },
-                    label = { Text("Starred (${favorites.size})") },
-                    leadingIcon = if (filter == HistoryFilter.FAVORITES) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    } else null
-                )
-            }
-            if (allHistory.isNotEmpty()) {
-                IconButton(onClick = { showClearDialog = true }) {
-                    Icon(
-                        Icons.Default.DeleteSweep,
-                        contentDescription = "Clear history",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
+            )
         }
-
-        // ── Empty state ──────────────────────────────────────────────────────
-        if (displayList.isEmpty()) {
-            Box(
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(vertical = padding.calculateTopPadding())) {
+            // ── Search bar ───────────────────────────────────────────────────────
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { vm.setHistorySearchQuery(it) },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text(stringResource(R.string.history_search_placeholder)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { vm.setHistorySearchQuery("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.history_search_clear_desc))
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // ── Filter chips + clear button ──────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        if (filter == HistoryFilter.FAVORITES) Icons.Default.StarBorder else Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = filter == HistoryFilter.ALL,
+                        onClick = { vm.setHistoryFilter(HistoryFilter.ALL) },
+                        label = { Text(stringResource(R.string.history_filter_all_template, allHistory.size)) },
+                        leadingIcon = if (filter == HistoryFilter.ALL) {
+                            {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else null
                     )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        if (searchQuery.isNotBlank()) "No results for \"$searchQuery\""
-                        else if (filter == HistoryFilter.FAVORITES) "No starred translations yet"
-                        else "No translations yet.\nTranslate something to see it here.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    FilterChip(
+                        selected = filter == HistoryFilter.FAVORITES,
+                        onClick = { vm.setHistoryFilter(HistoryFilter.FAVORITES) },
+                        label = { Text(stringResource(R.string.history_filter_starred_template, favorites.size)) },
+                        leadingIcon = if (filter == HistoryFilter.FAVORITES) {
+                            {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else null
                     )
+                }
+                if (allHistory.isNotEmpty()) {
+                    IconButton(onClick = { showClearDialog = true }) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = stringResource(R.string.history_clear_all_desc),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
-        } else {
-            // ── History list ─────────────────────────────────────────────────
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(
-                    items = displayList,
-                    key = { _, item -> item.id }
-                ) { _, entry ->
-                    val isExpanded = expandedId == entry.id
-                    HistoryCard(
-                        entry = entry,
-                        isExpanded = isExpanded,
-                        onToggleExpand = {
-                            expandedId = if (isExpanded) null else entry.id
-                        },
-                        onFavoriteToggle = { vm.toggleFavorite(entry) },
-                        onDelete = { vm.deleteHistoryEntry(entry) },
-                        onRestore = {
-                            vm.restoreFromHistory(entry)
-                            onRestore()
-                        },
-                        modifier = Modifier.animateItemPlacement(tween(200))
-                    )
+
+            // ── Empty state ──────────────────────────────────────────────────────
+            if (displayList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            if (filter == HistoryFilter.FAVORITES) Icons.Default.StarBorder else Icons.Default.History,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            if (searchQuery.isNotBlank()) stringResource(R.string.history_empty_search_template, searchQuery)
+                            else if (filter == HistoryFilter.FAVORITES) stringResource(R.string.history_empty_starred)
+                            else stringResource(R.string.history_empty_all),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                 }
-                item { Spacer(Modifier.height(8.dp)) }
+            } else {
+                // ── History list ─────────────────────────────────────────────────
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(
+                        items = displayList,
+                        key = { _, item -> item.id }
+                    ) { _, entry ->
+                        val isExpanded = expandedId == entry.id
+                        HistoryCard(
+                            entry = entry,
+                            isExpanded = isExpanded,
+                            onToggleExpand = {
+                                expandedId = if (isExpanded) null else entry.id
+                            },
+                            onFavoriteToggle = { vm.toggleFavorite(entry) },
+                            onDelete = { vm.deleteHistoryEntry(entry) },
+                            onRestore = {
+                                vm.restoreFromHistory(entry)
+                                onRestore()
+                            },
+                            modifier = Modifier.animateItemPlacement(tween(200))
+                        )
+                    }
+                    item { Spacer(Modifier.height(8.dp)) }
+                }
             }
         }
-    }
 
-    // ── Clear confirmation dialog ────────────────────────────────────────────
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
-            title = { Text("Clear History") },
-            text = { Text("Remove all non-starred translations? Starred items will be kept.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.clearHistory()
-                        showClearDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Clear") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Cancel") }
-            }
-        )
+        // ── Clear confirmation dialog ────────────────────────────────────────────
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
+                title = { Text(stringResource(R.string.history_clear_dialog_title)) },
+                text = { Text(stringResource(R.string.history_clear_dialog_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            vm.clearHistory()
+                            showClearDialog = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text(stringResource(R.string.history_clear_confirm)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.history_clear_cancel)) }
+                }
+            )
+        }
     }
 }
 
@@ -266,7 +336,7 @@ private fun HistoryCard(
                     ) {
                         Icon(
                             if (entry.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = if (entry.isFavorite) "Unstar" else "Star",
+                            contentDescription = if (entry.isFavorite) stringResource(R.string.history_unstar_desc) else stringResource(R.string.history_star_desc),
                             tint = if (entry.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                             modifier = Modifier.size(18.dp)
                         )

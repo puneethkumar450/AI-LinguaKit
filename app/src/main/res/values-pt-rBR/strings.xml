@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">Escuro</string>
     <string name="app_language_title">Idioma do app</string>
     <string name="app_language_subtitle">Escolha o idioma usado pela interface do aplicativo.</string>
+
+    <string name="manage_plan">Gerenciar plano</string>
+    <string name="language_packs_title">Pacotes de idiomas</string>
+    <string name="language_packs_subtitle">Gerenciar idiomas baixados offline.</string>
+    <string name="plan_usage_title">Plano e uso</string>
+    <string name="words_left_template">Restam %1$d palavras no plano gratuito</string>
+    <string name="downloaded_languages_template">%1$d idiomas baixados</string>
+    <string name="swap_translation_pair">Inverter entrada e resultado</string>
+    <string name="language_change_title">Alterar idioma do app</string>
+
+    <string name="history_title">Histórico</string>
+    <string name="history_search_placeholder">Pesquisar no histórico…</string>
+    <string name="history_search_clear_desc">Limpar pesquisa</string>
+    <string name="history_filter_all_template">Todos (%1$d)</string>
+    <string name="history_filter_starred_template">Favoritos (%1$d)</string>
+    <string name="history_clear_all_desc">Limpar histórico</string>
+    <string name="history_empty_search_template">Nenhum resultado para \"%1$s\"</string>
+    <string name="history_empty_starred">Nenhuma tradução favorita ainda</string>
+    <string name="history_empty_all">Nenhuma tradução ainda.\nTraduza algo para ver aqui.</string>
+    <string name="history_clear_dialog_title">Limpar histórico</string>
+    <string name="history_clear_dialog_message">Remover todas as traduções não favoritas? Os itens favoritos serão mantidos.</string>
+    <string name="history_clear_confirm">Limpar</string>
+    <string name="history_clear_cancel">Cancelar</string>
+    <string name="history_star_desc">Favoritar</string>
+    <string name="history_unstar_desc">Remover dos favoritos</string>
 </resources>

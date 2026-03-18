@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
@@ -49,9 +50,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,8 +67,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.translateapp.R
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
@@ -93,183 +98,198 @@ fun LanguagePacksScreen(
         .filter { it.status == PackStatus.DOWNLOADED }
         .sumOf { it.approximateSizeKb } / 1024
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            "Offline Language Packs",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "$downloadedCount / $totalCount downloaded • ~${storageUsedMb} MB used",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!isPremium) {
-                            TextButton(onClick = onUpgrade) {
-                                Text("Upgrade")
-                            }
-                        }
-                        IconButton(onClick = { vm.refreshPackStatus() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                        }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.language_packs_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back))
                     }
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                LinearProgressIndicator(
-                    progress = { if (totalCount > 0) downloadedCount.toFloat() / totalCount else 0f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(CircleShape)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            if (wifiOnly) Icons.Default.Wifi else Icons.Default.SignalCellularAlt,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(if (wifiOnly) "Wi-Fi only" else "Any network")
-                        Switch(checked = wifiOnly, onCheckedChange = { wifiOnly = it })
-                    }
-
-                    if (!isPremium) {
-                        Text(
-                            "Free plan: 2 languages max",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                }
-            }
+            )
         }
-
-        if (!isPremium) {
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.background.copy(0.1f))
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null)
-                    Text("Delete a downloaded language to free a slot, then download a new one.")
-                }
-            }
-        }
-
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val downloadedPacks = allPacks.filter { it.status == PackStatus.DOWNLOADED }
-            val otherPacks = allPacks.filter { it.status != PackStatus.DOWNLOADED }
-
-            if (downloadedPacks.isNotEmpty()) {
-                item {
-                    SectionHeader("Downloaded (${downloadedPacks.size})", Icons.Default.CheckCircle, Color(0xFF16A34A))
-                }
-                items(downloadedPacks, key = { it.mlKitCode }) { pack ->
-                    PackCard(
-                        pack = pack,
-                        isDownloading = downloading.contains(pack.mlKitCode),
-                        onDownload = {},
-                        onDelete = { showDeleteDialog = pack }
-                    )
-                }
-            }
-
-            if (otherPacks.isNotEmpty()) {
-                item {
-                    SectionHeader("Not Downloaded (${otherPacks.size})", Icons.Default.CloudOff, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                }
-                items(otherPacks, key = { it.mlKitCode }) { pack ->
-                    PackCard(
-                        pack = pack,
-                        isDownloading = downloading.contains(pack.mlKitCode),
-                        onDownload = {
-                            if (vm.canDownloadPack(pack.mlKitCode)) {
-                                vm.downloadPack(pack.mlKitCode, wifiOnly)
-                            } else {
-                                showUpgradeDialog = pack
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "Offline Language Packs",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "$downloadedCount / $totalCount downloaded • ~${storageUsedMb} MB used",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!isPremium) {
+                                TextButton(onClick = onUpgrade) {
+                                    Text("Upgrade")
+                                }
                             }
-                        },
-                        onDelete = {}
+                            IconButton(onClick = { vm.refreshPackStatus() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { if (totalCount > 0) downloadedCount.toFloat() / totalCount else 0f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(CircleShape)
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                if (wifiOnly) Icons.Default.Wifi else Icons.Default.SignalCellularAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(if (wifiOnly) "Wi-Fi only" else "Any network")
+                            Switch(checked = wifiOnly, onCheckedChange = { wifiOnly = it })
+                        }
+
+                        if (!isPremium) {
+                            Text(
+                                "Free plan: 2 languages max",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!isPremium) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null)
+                        Text("Delete a downloaded language to free a slot, then download a new one.")
+                    }
+                }
+            }
+
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val downloadedPacks = allPacks.filter { it.status == PackStatus.DOWNLOADED }
+                val otherPacks = allPacks.filter { it.status != PackStatus.DOWNLOADED }
+
+                if (downloadedPacks.isNotEmpty()) {
+                    item {
+                        SectionHeader("Downloaded (${downloadedPacks.size})", Icons.Default.CheckCircle, Color(0xFF16A34A))
+                    }
+                    items(downloadedPacks, key = { it.mlKitCode }) { pack ->
+                        PackCard(
+                            pack = pack,
+                            isDownloading = downloading.contains(pack.mlKitCode),
+                            onDownload = {},
+                            onDelete = { showDeleteDialog = pack }
+                        )
+                    }
+                }
+
+                if (otherPacks.isNotEmpty()) {
+                    item {
+                        SectionHeader("Not Downloaded (${otherPacks.size})", Icons.Default.CloudOff, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                    items(otherPacks, key = { it.mlKitCode }) { pack ->
+                        PackCard(
+                            pack = pack,
+                            isDownloading = downloading.contains(pack.mlKitCode),
+                            onDownload = {
+                                if (vm.canDownloadPack(pack.mlKitCode)) {
+                                    vm.downloadPack(pack.mlKitCode, wifiOnly)
+                                } else {
+                                    showUpgradeDialog = pack
+                                }
+                            },
+                            onDelete = {}
+                        )
+                    }
                 }
             }
         }
-    }
 
-    showDeleteDialog?.let { pack ->
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = null },
-            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
-            title = { Text("Remove ${pack.displayName}?") },
-            text = { Text("This frees one free-plan slot so you can download another language.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.deletePack(pack.mlKitCode)
-                        showDeleteDialog = null
-                    }
-                ) { Text("Remove") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) { Text("Cancel") }
-            }
-        )
-    }
+        showDeleteDialog?.let { pack ->
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = null },
+                icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
+                title = { Text("Remove ${pack.displayName}?") },
+                text = { Text("This frees one free-plan slot so you can download another language.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            vm.deletePack(pack.mlKitCode)
+                            showDeleteDialog = null
+                        }
+                    ) { Text("Remove") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = null }) { Text("Cancel") }
+                }
+            )
+        }
 
-    showUpgradeDialog?.let { pack ->
-        AlertDialog(
-            onDismissRequest = { showUpgradeDialog = null },
-            icon = { Icon(Icons.Default.Star, contentDescription = null) },
-            title = { Text("Upgrade for more languages") },
-            text = {
-                Text("You are using the free plan. Delete one downloaded language or upgrade to download ${pack.displayName} and more packs.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showUpgradeDialog = null
-                        onUpgrade()
-                    }
-                ) { Text("Upgrade") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUpgradeDialog = null }) { Text("Later") }
-            }
-        )
+        showUpgradeDialog?.let { pack ->
+            AlertDialog(
+                onDismissRequest = { showUpgradeDialog = null },
+                icon = { Icon(Icons.Default.Star, contentDescription = null) },
+                title = { Text("Upgrade for more languages") },
+                text = {
+                    Text("You are using the free plan. Delete one downloaded language or upgrade to download ${pack.displayName} and more packs.")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showUpgradeDialog = null
+                            onUpgrade()
+                        }
+                    ) { Text("Upgrade") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showUpgradeDialog = null }) { Text("Later") }
+                }
+            )
+        }
     }
 }
 

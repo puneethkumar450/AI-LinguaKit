@@ -30,7 +30,7 @@
     <string name="plan_point_premium_speech">Speech input and premium features</string>
     <string name="premium_active">Premium active</string>
     <string name="upgrade_now">Upgrade now</string>
-    <string name="connecting_play_billing">Connecting to Play Billing...</string>
+    <string name="connecting_play_billing">Connecting to Play Billing…</string>
     <string name="billing_note">Play Billing is integrated with local purchase checks on app startup. Server-side license verification is still a TODO for a stronger production setup.</string>
     <string name="refresh_purchase_status">Refresh purchase status</string>
     <string name="manage_plan">Manage plan</string>
@@ -47,6 +47,22 @@
     <string name="words_left_template">%1$d words left in free plan</string>
     <string name="downloaded_languages_template">%1$d downloaded languages</string>
 
-    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="admob_banner_unit_id">ca-app-pub-3940256099942544/9214589741</string>
+    <string name="history_title">History</string>
+    <string name="history_search_placeholder">Search history…</string>
+    <string name="history_search_clear_desc">Clear search</string>
+    <string name="history_filter_all_template">All (%1$d)</string>
+    <string name="history_filter_starred_template">Starred (%1$d)</string>
+    <string name="history_clear_all_desc">Clear history</string>
+    <string name="history_empty_search_template">No results for \"%1$s\"</string>
+    <string name="history_empty_starred">No starred translations yet</string>
+    <string name="history_empty_all">No translations yet.\nTranslate something to see it here.</string>
+    <string name="history_clear_dialog_title">Clear History</string>
+    <string name="history_clear_dialog_message">Remove all non-starred translations? Starred items will be kept.</string>
+    <string name="history_clear_confirm">Clear</string>
+    <string name="history_clear_cancel">Cancel</string>
+    <string name="history_star_desc">Star</string>
+    <string name="history_unstar_desc">Unstar</string>
+
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_unit_id" translatable="false">ca-app-pub-3940256099942544/9214589741</string>
 </resources>

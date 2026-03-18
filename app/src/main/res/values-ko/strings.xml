@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">다크</string>
     <string name="app_language_title">앱 언어</string>
     <string name="app_language_subtitle">앱 인터페이스에 사용할 언어를 선택하세요.</string>
+
+    <string name="manage_plan">요금제 관리</string>
+    <string name="language_packs_title">언어팩</string>
+    <string name="language_packs_subtitle">다운로드한 오프라인 언어를 관리합니다.</string>
+    <string name="plan_usage_title">요금제 및 사용량</string>
+    <string name="words_left_template">무료 요금제 남은 단어: %1$d개</string>
+    <string name="downloaded_languages_template">다운로드된 언어: %1$d개</string>
+    <string name="swap_translation_pair">입력 및 결과 교체</string>
+    <string name="language_change_title">앱 언어 변경</string>
+
+    <string name="history_title">기록</string>
+    <string name="history_search_placeholder">기록 검색…</string>
+    <string name="history_search_clear_desc">검색 지우기</string>
+    <string name="history_filter_all_template">전체 (%1$d)</string>
+    <string name="history_filter_starred_template">중요 (%1$d)</string>
+    <string name="history_clear_all_desc">기록 삭제</string>
+    <string name="history_empty_search_template">\"%1$s\"에 대한 결과 없음</string>
+    <string name="history_empty_starred">아직 즐겨찾기한 번역이 없습니다</string>
+    <string name="history_empty_all">아직 번역 기록이 없습니다.\n번역을 하면 여기에 표시됩니다.</string>
+    <string name="history_clear_dialog_title">기록 삭제</string>
+    <string name="history_clear_dialog_message">중요 표시되지 않은 모든 번역을 삭제하시겠습니까? 중요 항목은 유지됩니다.</string>
+    <string name="history_clear_confirm">삭제</string>
+    <string name="history_clear_cancel">취소</string>
+    <string name="history_star_desc">중요 표시</string>
+    <string name="history_unstar_desc">중요 표시 해제</string>
 </resources>

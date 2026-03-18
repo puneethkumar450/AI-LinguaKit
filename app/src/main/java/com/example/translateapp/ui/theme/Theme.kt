@@ -20,7 +20,10 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = TextPrimaryLight,
     onSecondary = TextPrimaryLight,
     onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark
+    onSurface = TextPrimaryDark,
+    primaryContainer =  BrandBlue.copy(0.05f),
+    onPrimaryContainer = Color.White,
+    onSurfaceVariant = Color.White.copy(0.7f)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -31,7 +34,11 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     onSecondary = TextPrimaryLight,
     onBackground = TextPrimaryLight,
-    onSurface = TextPrimaryLight
+    onSurface = TextPrimaryLight,
+    primaryContainer =  BrandBlue.copy(0.05f),
+    onPrimaryContainer = Color.Black,
+    onSurfaceVariant = Color.Black.copy(0.7f)
+
 )
 
 @Composable

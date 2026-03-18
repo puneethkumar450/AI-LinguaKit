@@ -35,4 +35,29 @@
     <string name="theme_mode_dark">डार्क</string>
     <string name="app_language_title">ऐप भाषा</string>
     <string name="app_language_subtitle">ऐप इंटरफ़ेस में उपयोग की जाने वाली भाषा चुनें।</string>
+
+    <string name="manage_plan">प्लान प्रबंधित करें</string>
+    <string name="language_packs_title">भाषा पैक</string>
+    <string name="language_packs_subtitle">डाउनलोड की गई ऑफ़लाइन भाषाओं को प्रबंधित करें।</string>
+    <string name="plan_usage_title">प्लान और उपयोग</string>
+    <string name="words_left_template">फ्री प्लान में %1$d शब्द बचे हैं</string>
+    <string name="downloaded_languages_template">%1$d डाउनलोड की गई भाषाएँ</string>
+    <string name="swap_translation_pair">इनपुट और परिणाम बदलें</string>
+    <string name="language_change_title">ऐप की भाषा बदलें</string>
+
+    <string name="history_title">इतिहास</string>
+    <string name="history_search_placeholder">इतिहास में खोजें…</string>
+    <string name="history_search_clear_desc">खोज साफ़ करें</string>
+    <string name="history_filter_all_template">सभी (%1$d)</string>
+    <string name="history_filter_starred_template">तारांकित (%1$d)</string>
+    <string name="history_clear_all_desc">इतिहास साफ़ करें</string>
+    <string name="history_empty_search_template">\"%1$s\" के लिए कोई परिणाम नहीं</string>
+    <string name="history_empty_starred">अभी तक कोई तारांकित अनुवाद नहीं है</string>
+    <string name="history_empty_all">अभी तक कोई अनुवाद नहीं है।\nइसे यहाँ देखने के लिए कुछ अनुवाद करें।</string>
+    <string name="history_clear_dialog_title">इतिहास साफ़ करें</string>
+    <string name="history_clear_dialog_message">सभी गैर-तारांकित अनुवाद हटाएँ? तारांकित आइटम रखे जाएंगे।</string>
+    <string name="history_clear_confirm">साफ़ करें</string>
+    <string name="history_clear_cancel">रद्द करें</string>
+    <string name="history_star_desc">तारांकित करें</string>
+    <string name="history_unstar_desc">सितारा हटाएँ</string>
 </resources>
