@@ -1,8 +1,52 @@
 <resources>
     <string name="app_name">AI-LinguaKit</string>
+    <string name="back">Back</string>
+    <string name="confirm">Confirm</string>
+    <string name="continue_label">Continue</string>
+    <string name="continue_in_seconds">Continue in %1$ds</string>
     <string name="enter_text_placeholder">Enter text</string>
-    <string name="conversation_label">Conversation</string>
-    <string name="camera_label">Camera</string>
-    <string name="english_label">English</string>
-    <string name="italian_label">Italian</string>
+    <string name="settings_title">Settings</string>
+    <string name="language_change_title">Change app language</string>
+    <string name="choose_two_languages">Choose 2 Languages</string>
+    <string name="selected_count_template">%1$d/2</string>
+    <string name="swap_translation_pair">Swap input and result</string>
+
+    <string name="advertisement_title">Advertisement</string>
+    <string name="advertisement_thanks">Thanks for using AI-LinguaKit</string>
+    <string name="advertisement_message">Free plan ads help support offline language downloads and translation costs.</string>
+
+    <string name="choose_your_plan">Choose your plan</string>
+    <string name="plan_free_title">Free</string>
+    <string name="plan_free_subtitle">Good for getting started</string>
+    <string name="plan_point_free_languages">2 downloaded languages</string>
+    <string name="plan_point_free_words">5,000 translated words</string>
+    <string name="plan_point_free_ads">Banner ads and ad breaks</string>
+    <string name="plan_point_free_manual">Manual text translation</string>
+    <string name="plan_premium_title">Premium</string>
+    <string name="plan_premium_pricing_fallback">See Play pricing</string>
+    <string name="plan_point_premium_words">Unlimited translated words</string>
+    <string name="plan_point_premium_languages">Unlimited language packs</string>
+    <string name="plan_point_premium_ads">No ads</string>
+    <string name="plan_point_premium_speech">Speech input and premium features</string>
+    <string name="premium_active">Premium active</string>
+    <string name="upgrade_now">Upgrade now</string>
+    <string name="connecting_play_billing">Connecting to Play Billing...</string>
+    <string name="billing_note">Play Billing is integrated with local purchase checks on app startup. Server-side license verification is still a TODO for a stronger production setup.</string>
+    <string name="refresh_purchase_status">Refresh purchase status</string>
+    <string name="manage_plan">Manage plan</string>
+
+    <string name="theme_mode_title">Theme</string>
+    <string name="theme_mode_system">Follow system</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="app_language_title">App language</string>
+    <string name="app_language_subtitle">Choose the language used by the app interface.</string>
+    <string name="language_packs_title">Language packs</string>
+    <string name="language_packs_subtitle">Manage downloaded offline languages.</string>
+    <string name="plan_usage_title">Plan and usage</string>
+    <string name="words_left_template">%1$d words left in free plan</string>
+    <string name="downloaded_languages_template">%1$d downloaded languages</string>
+
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_unit_id">ca-app-pub-3940256099942544/9214589741</string>
 </resources>

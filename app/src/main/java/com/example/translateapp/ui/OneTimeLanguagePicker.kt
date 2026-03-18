@@ -17,10 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.translateapp.R
 import com.example.translateapp.viewmodel.LanguageOption
 import com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
 
@@ -37,7 +39,7 @@ fun OneTimeLanguagePicker(
                 title = {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Choose 2 Languages",
+                            text = stringResource(R.string.choose_two_languages),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 24.sp
@@ -60,7 +62,7 @@ fun OneTimeLanguagePicker(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
-                                contentDescription = "Confirm",
+                                contentDescription = stringResource(R.string.confirm),
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -68,7 +70,7 @@ fun OneTimeLanguagePicker(
                     } else {
                         // Show count if not yet 2
                         Text(
-                            text = "${selectedLanguages.size}/2",
+                            text = stringResource(R.string.selected_count_template, selectedLanguages.size),
                             modifier = Modifier.padding(end = 16.dp),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                         )

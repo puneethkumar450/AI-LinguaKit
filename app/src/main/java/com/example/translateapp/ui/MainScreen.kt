@@ -1,79 +1,140 @@
 package com.example.translateapp.ui
 
-import androidx.compose.runtime.*
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun MainScreen(vm: AppViewModel = viewModel()) {
     val isFirstRun by vm.isFirstRun.collectAsState()
-    val isLiveCameraMode by vm.isLiveCameraMode.collectAsState()
-    val navController = rememberNavController()
-    
+    val isPremium by vm.isPremium.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val navController = rememberNavController()
+
     val downloadedCodes = remember(allPacks) {
-        allPacks.filter { it.status == PackStatus.DOWNLOADED }.map { it.mlKitCode }.toSet()
+        allPacks.filter { it.status == PackStatus.DOWNLOADED }
+            .map { it.mlKitCode }
+            .toSet()
     }
 
-    if (isFirstRun) {
-        OneTimeLanguagePicker(
-            onLanguagesSelected = { source, target ->
-                vm.completeFirstRun(source, target)
-            }
-        )
-    } else {
-        NavHost(navController = navController, startDestination = "translate") {
-            composable("translate") {
-                ModernTranslateScreen(
-                    vm = vm,
-                    onNavigateToHistory = { navController.navigate("history") },
-                    onNavigateToPacks = { navController.navigate("packs") },
-                    onNavigateToSourcePicker = { navController.navigate("source_picker") },
-                    onNavigateToTargetPicker = { navController.navigate("target_picker") }
-                )
-            }
-            composable("history") {
-                HistoryScreen(
-                    vm = vm,
-                    onBack = { navController.popBackStack() },
-                    onRestore = { navController.popBackStack() }
-                )
-            }
-            composable("packs") {
-                LanguagePacksScreen(
-                    vm = vm,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-            composable("source_picker") {
-                LanguagePickerScreen(
-                    title = "Translate from",
-                    selected = vm.translateSourceLang.collectAsState().value,
-                    options = listOf(com.example.translateapp.viewmodel.AUTO_DETECT_OPTION) + com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES,
-                    downloadedCodes = downloadedCodes,
-                    onSelect = { 
-                        vm.setTranslateSourceLang(it)
-                        navController.popBackStack()
-                    },
-                    onBack = { navController.popBackStack() }
-                )
-            }
-            composable("target_picker") {
-                LanguagePickerScreen(
-                    title = "Translate to",
-                    selected = vm.translateTargetLang.collectAsState().value,
-                    options = com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES,
-                    downloadedCodes = downloadedCodes,
-                    onSelect = { 
-                        vm.setTranslateTargetLang(it)
-                        navController.popBackStack()
-                    },
-                    onBack = { navController.popBackStack() }
-                )
+    LaunchedEffect(Unit) {
+        vm.uiMessage.collectLatest { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        vm.showInterstitialAd.collectLatest {
+            navController.navigate("advertisement")
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        if (isFirstRun) {
+            OneTimeLanguagePicker(
+                onLanguagesSelected = { source, target ->
+                    vm.completeFirstRun(source, target)
+                }
+            )
+        } else {
+            NavHost(
+                navController = navController,
+                startDestination = "translate"
+            ) {
+                composable("translate") {
+                    ModernTranslateScreen(
+                        vm = vm,
+                        onNavigateToHistory = { navController.navigate("history") },
+                        onNavigateToSettings = { navController.navigate("settings") },
+                        onNavigateToSourcePicker = {
+                            if (isPremium) navController.navigate("source_picker")
+                        },
+                        onNavigateToTargetPicker = {
+                            if (isPremium) navController.navigate("target_picker")
+                        }
+                    )
+                }
+                composable("history") {
+                    HistoryScreen(
+                        vm = vm,
+                        onBack = { navController.popBackStack() },
+                        onRestore = { navController.popBackStack() }
+                    )
+                }
+                composable("packs") {
+                    LanguagePacksScreen(
+                        vm = vm,
+                        onBack = { navController.popBackStack() },
+                        onUpgrade = { navController.navigate("plan_selection") }
+                    )
+                }
+                composable("plan_selection") {
+                    PlanSelectionScreen(
+                        vm = vm,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("settings") {
+                    SettingsScreenUI(
+                        vm = vm,
+                        onBack = { navController.popBackStack() },
+                        onOpenLanguageChange = { navController.navigate("language_change") },
+                        onOpenPlans = { navController.navigate("plan_selection") },
+                        onOpenLanguagePacks = { navController.navigate("packs") }
+                    )
+                }
+                composable("language_change") {
+                    LanguageChangeScreenUI(
+                        vm = vm,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("advertisement") {
+                    AdvertisementScreenUI(
+                        onFinished = { navController.popBackStack() }
+                    )
+                }
+                composable("source_picker") {
+                    LanguagePickerScreen(
+                        title = "Translate from",
+                        selected = vm.translateSourceLang.collectAsState().value,
+                        options = vm.getSelectableSourceLanguages(),
+                        downloadedCodes = downloadedCodes,
+                        onSelect = {
+                            vm.setTranslateSourceLang(it)
+                            navController.popBackStack()
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("target_picker") {
+                    LanguagePickerScreen(
+                        title = "Translate to",
+                        selected = vm.translateTargetLang.collectAsState().value,
+                        options = vm.getSelectableTargetLanguages(),
+                        downloadedCodes = downloadedCodes,
+                        onSelect = {
+                            vm.setTranslateTargetLang(it)
+                            navController.popBackStack()
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }

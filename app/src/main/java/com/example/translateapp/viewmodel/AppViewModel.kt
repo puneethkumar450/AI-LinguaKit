@@ -1,5 +1,6 @@
 package com.example.translateapp.viewmodel
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -17,7 +18,11 @@ import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.data.TranslationHistoryEntity
+import com.example.translateapp.service.BillingRepository
 import com.example.translateapp.service.ConnectivityHelper
+import com.example.translateapp.service.AppLanguageOption
+import com.example.translateapp.service.AppSettingsManager
+import com.example.translateapp.service.AppThemeMode
 import com.example.translateapp.service.LanguagePackRepository
 import com.example.translateapp.service.ModelDownloadManager
 import com.google.mlkit.nl.languageid.IdentifiedLanguage
@@ -35,87 +40,90 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import kotlin.coroutines.resume
 
-// ── Language definitions ──────────────────────────────────────────────────────
-
 data class LanguageOption(val code: String, val displayName: String, val mlKitCode: String)
 
 val AUTO_DETECT_OPTION = LanguageOption("auto", "Auto Detect", "auto")
 
 val SUPPORTED_LANGUAGES = listOf(
-    LanguageOption("en", "English",    TranslateLanguage.ENGLISH),
-    LanguageOption("es", "Spanish",    TranslateLanguage.SPANISH),
-    LanguageOption("fr", "French",     TranslateLanguage.FRENCH),
-    LanguageOption("de", "German",     TranslateLanguage.GERMAN),
-    LanguageOption("it", "Italian",    TranslateLanguage.ITALIAN),
+    LanguageOption("en", "English", TranslateLanguage.ENGLISH),
+    LanguageOption("es", "Spanish", TranslateLanguage.SPANISH),
+    LanguageOption("fr", "French", TranslateLanguage.FRENCH),
+    LanguageOption("de", "German", TranslateLanguage.GERMAN),
+    LanguageOption("it", "Italian", TranslateLanguage.ITALIAN),
     LanguageOption("pt", "Portuguese", TranslateLanguage.PORTUGUESE),
-    LanguageOption("zh", "Chinese",    TranslateLanguage.CHINESE),
-    LanguageOption("ja", "Japanese",   TranslateLanguage.JAPANESE),
-    LanguageOption("ko", "Korean",     TranslateLanguage.KOREAN),
-    LanguageOption("ar", "Arabic",     TranslateLanguage.ARABIC),
-    LanguageOption("ru", "Russian",    TranslateLanguage.RUSSIAN),
-    LanguageOption("hi", "Hindi",      TranslateLanguage.HINDI),
-    LanguageOption("ta", "Tamil",      TranslateLanguage.TAMIL),
-    LanguageOption("te", "Telugu",     TranslateLanguage.TELUGU),
-    LanguageOption("bn", "Bengali",    TranslateLanguage.BENGALI),
-    LanguageOption("mr", "Marathi",    TranslateLanguage.MARATHI),
-    LanguageOption("kn", "Kannada",    TranslateLanguage.KANNADA),
+    LanguageOption("zh", "Chinese", TranslateLanguage.CHINESE),
+    LanguageOption("ja", "Japanese", TranslateLanguage.JAPANESE),
+    LanguageOption("ko", "Korean", TranslateLanguage.KOREAN),
+    LanguageOption("ar", "Arabic", TranslateLanguage.ARABIC),
+    LanguageOption("ru", "Russian", TranslateLanguage.RUSSIAN),
+    LanguageOption("hi", "Hindi", TranslateLanguage.HINDI),
+    LanguageOption("ta", "Tamil", TranslateLanguage.TAMIL),
+    LanguageOption("te", "Telugu", TranslateLanguage.TELUGU),
+    LanguageOption("bn", "Bengali", TranslateLanguage.BENGALI),
+    LanguageOption("mr", "Marathi", TranslateLanguage.MARATHI),
+    LanguageOption("kn", "Kannada", TranslateLanguage.KANNADA),
     LanguageOption("vi", "Vietnamese", TranslateLanguage.VIETNAMESE),
 )
 
 enum class HistoryFilter { ALL, FAVORITES }
 
-// ── ViewModel ─────────────────────────────────────────────────────────────────
+private const val TAG = "AppViewModel"
+private const val PREF_IS_FIRST_RUN = "is_first_run"
+private const val PREF_SOURCE_LANG_CODE = "source_lang_code"
+private const val PREF_TARGET_LANG_CODE = "target_lang_code"
+private const val PREF_FREE_WORDS_USED = "free_words_used"
+private const val PREF_TRANSLATE_ACTIONS = "translate_actions"
+private const val PREF_COUNTED_TRANSLATION_KEYS = "counted_translation_keys"
+private const val PREF_FREE_LANGUAGE_CODES = "free_language_codes"
+private const val FREE_WORD_LIMIT = 5_000
+private const val FREE_LANGUAGE_LIMIT = 2
+private const val AD_FREQUENCY = 3
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
-    // ── Infrastructure ────────────────────────────────────────────────────────
-    private val db         = AppDatabase.getInstance(application)
+    private val db = AppDatabase.getInstance(application)
     private val historyDao = db.historyDao()
-    private val packDao    = db.languagePackDao()
+    private val packDao = db.languagePackDao()
     private val downloader = ModelDownloadManager()
-    val packRepo           = LanguagePackRepository(packDao, downloader, viewModelScope)
+    val packRepo = LanguagePackRepository(packDao, downloader, viewModelScope)
+    private val billingRepo = BillingRepository(application, prefs)
 
-    // ── First Run Logic ───────────────────────────────────────────────────────
-    private val _isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
+    private val _isFirstRun = MutableStateFlow(prefs.getBoolean(PREF_IS_FIRST_RUN, true))
     val isFirstRun: StateFlow<Boolean> = _isFirstRun.asStateFlow()
 
-    fun completeFirstRun(source: LanguageOption, target: LanguageOption) {
-        prefs.edit().apply {
-            putBoolean("is_first_run", false)
-            putString("source_lang_code", source.code)
-            putString("target_lang_code", target.code)
-            apply()
-        }
-        _isFirstRun.value = false
-        _translateSourceLang.value = source
-        _translateTargetLang.value = target
+    val isPremium: StateFlow<Boolean> = billingRepo.isPremium
+    val premiumProduct = billingRepo.premiumProduct
+    val billingReady = billingRepo.billingReady
+    private val _themeMode = MutableStateFlow(AppSettingsManager.getSavedThemeMode(application))
+    val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
+    private val _appLanguageTag = MutableStateFlow(AppSettingsManager.getSavedLanguageTag(application))
+    val appLanguageTag: StateFlow<String> = _appLanguageTag.asStateFlow()
+    val supportedAppLanguages: List<AppLanguageOption> = AppSettingsManager.supportedLanguages()
 
-        viewModelScope.launch {
-            downloader.warmUp(source.mlKitCode, target.mlKitCode)
-        }
-    }
-
-    // ── Plan Management ───────────────────────────────────────────────────────
-    private val _isPremium = MutableStateFlow(false)
-    val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
-
-    fun togglePremium() {
-        _isPremium.value = !_isPremium.value
-    }
-
-    // ── One-shot UI messages (Snackbar) ───────────────────────────────────────
-    private val _uiMessage = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    private val _uiMessage = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val uiMessage = _uiMessage.asSharedFlow()
 
-    // ── History flows ─────────────────────────────────────────────────────────
+    private val _showInterstitialAd = MutableSharedFlow<Unit>(extraBufferCapacity = 2)
+    val showInterstitialAd = _showInterstitialAd.asSharedFlow()
+
+    private val _freeWordsUsed = MutableStateFlow(prefs.getInt(PREF_FREE_WORDS_USED, 0))
+    val freeWordsUsed: StateFlow<Int> = _freeWordsUsed.asStateFlow()
+
+    private val _translateActions = MutableStateFlow(prefs.getInt(PREF_TRANSLATE_ACTIONS, 0))
+    val translateActions: StateFlow<Int> = _translateActions.asStateFlow()
+
+    private val _freePlanLanguages = MutableStateFlow(loadInitialFreeLanguages())
+    val freePlanLanguages: StateFlow<List<LanguageOption>> = _freePlanLanguages.asStateFlow()
+
     val allHistory: StateFlow<List<TranslationHistoryEntity>> = historyDao.getAllHistory()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -128,35 +136,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _historySearchQuery = MutableStateFlow("")
     val historySearchQuery: StateFlow<String> = _historySearchQuery.asStateFlow()
 
-    // ── TTS ───────────────────────────────────────────────────────────────────
     private var tts: TextToSpeech? = null
-    private val _ttsReady   = MutableStateFlow(false)
+    private val _ttsReady = MutableStateFlow(false)
     val ttsReady: StateFlow<Boolean> = _ttsReady.asStateFlow()
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
-    // ── Translate feature ─────────────────────────────────────────────────────
-    private val _translateInput     = MutableStateFlow("")
+    private val _translateInput = MutableStateFlow("")
     val translateInput: StateFlow<String> = _translateInput.asStateFlow()
 
-    private val _translatedText     = MutableStateFlow("")
+    private val _translatedText = MutableStateFlow("")
     val translatedText: StateFlow<String> = _translatedText.asStateFlow()
 
-    private val _translateSourceLang = MutableStateFlow(
-        SUPPORTED_LANGUAGES.find { it.code == prefs.getString("source_lang_code", "en") } ?: SUPPORTED_LANGUAGES[0]
-    )
+    private val _translateSourceLang = MutableStateFlow(loadInitialSourceLanguage())
     val translateSourceLang: StateFlow<LanguageOption> = _translateSourceLang.asStateFlow()
 
-    private val _translateTargetLang = MutableStateFlow(
-        SUPPORTED_LANGUAGES.find { it.code == prefs.getString("target_lang_code", "es") } ?: SUPPORTED_LANGUAGES[1]
-    )
+    private val _translateTargetLang = MutableStateFlow(loadInitialTargetLanguage())
     val translateTargetLang: StateFlow<LanguageOption> = _translateTargetLang.asStateFlow()
 
-    private val _translateLoading   = MutableStateFlow(false)
+    private val _translateLoading = MutableStateFlow(false)
     val translateLoading: StateFlow<Boolean> = _translateLoading.asStateFlow()
 
-    private val _translateError     = MutableStateFlow<String?>(null)
+    private val _translateError = MutableStateFlow<String?>(null)
     val translateError: StateFlow<String?> = _translateError.asStateFlow()
 
     enum class TranslateSource { NONE, OFFLINE, ONLINE, HISTORY }
@@ -164,115 +166,280 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _translateSource = MutableStateFlow(TranslateSource.NONE)
     val translateSource: StateFlow<TranslateSource> = _translateSource.asStateFlow()
 
-    // ── TTS feature ───────────────────────────────────────────────────────────
-    private val _ttsInput    = MutableStateFlow("")
-    val ttsInput: StateFlow<String> = _ttsInput.asStateFlow()
-
-    private val _ttsLanguage = MutableStateFlow(SUPPORTED_LANGUAGES[0])
-    val ttsLanguage: StateFlow<LanguageOption> = _ttsLanguage.asStateFlow()
-
-    // ── Speech to Speech feature ──────────────────────────────────────────────
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
     private val _detectedLanguage = MutableStateFlow<LanguageOption?>(null)
     val detectedLanguage: StateFlow<LanguageOption?> = _detectedLanguage.asStateFlow()
 
-    private var speechRecognizer: SpeechRecognizer? = null
-
-    // ── OCR feature ───────────────────────────────────────────────────────────
-    private val _isLiveCameraMode   = MutableStateFlow(false)
+    private val _isLiveCameraMode = MutableStateFlow(false)
     val isLiveCameraMode: StateFlow<Boolean> = _isLiveCameraMode.asStateFlow()
 
-    fun setLiveCameraMode(enabled: Boolean) {
-        _isLiveCameraMode.value = enabled
-    }
+    private val _ocrText = MutableStateFlow("")
+    val ocrText: StateFlow<String> = _ocrText.asStateFlow()
 
-    private val _ocrText            = MutableStateFlow("")
-    val ocrText: StateFlow<String>  = _ocrText.asStateFlow()
-
-    private val _ocrTranslatedText  = MutableStateFlow("")
+    private val _ocrTranslatedText = MutableStateFlow("")
     val ocrTranslatedText: StateFlow<String> = _ocrTranslatedText.asStateFlow()
 
-    private val _ocrLoading         = MutableStateFlow(false)
+    private val _ocrLoading = MutableStateFlow(false)
     val ocrLoading: StateFlow<Boolean> = _ocrLoading.asStateFlow()
 
-    private val _ocrError           = MutableStateFlow<String?>(null)
+    private val _ocrError = MutableStateFlow<String?>(null)
     val ocrError: StateFlow<String?> = _ocrError.asStateFlow()
 
-    private val _ocrTtsLanguage     = MutableStateFlow(SUPPORTED_LANGUAGES[0])
-    val ocrTtsLanguage: StateFlow<LanguageOption> = _ocrTtsLanguage.asStateFlow()
-
-    // ── Language pack management ──────────────────────────────────────────────
     val allPacks: StateFlow<List<LanguagePackEntity>> = packRepo.allPacks
 
     private val _downloadingPacks = MutableStateFlow<Set<String>>(emptySet())
     val downloadingPacks: StateFlow<Set<String>> = _downloadingPacks.asStateFlow()
 
-    fun observePackStatus(mlKitCode: String): Flow<LanguagePackEntity?> =
-        packRepo.observePack(mlKitCode)
-
-    // ── Init ──────────────────────────────────────────────────────────────────
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var translateJob: Job? = null
 
     init {
         packRepo.initAsync()
-        //initTts(application)
-       // initSpeechRecognizer(application)
-        
-        // Warm up only if already downloaded or if premium
-        /*viewModelScope.launch {
-            val enReady = packDao.getByCode(TranslateLanguage.ENGLISH)?.status == PackStatus.DOWNLOADED
-            val esReady = packDao.getByCode(SUPPORTED_LANGUAGES[1].mlKitCode)?.status == PackStatus.DOWNLOADED
-            if (_isPremium.value || (enReady && esReady)) {
-                downloader.warmUp(TranslateLanguage.ENGLISH, SUPPORTED_LANGUAGES[1].mlKitCode)
-            }
-        }*/
-    }
+        initTts(application)
+        initSpeechRecognizer(application)
+        reconcileFreeLanguagesWithCurrentState()
 
-    private fun initTts(application: Application) {
-        tts = TextToSpeech(application) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                _ttsReady.value = true
-                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(id: String?) { _isSpeaking.value = true }
-                    override fun onDone(id: String?)  { _isSpeaking.value = false }
-                    override fun onError(id: String?) { _isSpeaking.value = false }
-                })
+        viewModelScope.launch {
+            billingRepo.isPremium.collectLatest { premium ->
+                if (premium) {
+                    _translateError.value = null
+                } else {
+                    reconcileFreeLanguagesWithCurrentState()
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            billingRepo.billingMessage.collectLatest { message ->
+                if (!message.isNullOrBlank()) {
+                    _uiMessage.emit(message)
+                    billingRepo.clearBillingMessage()
+                }
             }
         }
     }
 
-    private fun initSpeechRecognizer(application: Application) {
-        if (SpeechRecognizer.isRecognitionAvailable(application)) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) { _isRecording.value = true }
-                    override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() { _isRecording.value = false }
-                    override fun onError(error: Int) {
-                        _isRecording.value = false
-                        Log.e("AppViewModel", "Speech recognition error: $error")
-                    }
-                    override fun onResults(results: Bundle?) {
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        if (!matches.isNullOrEmpty()) {
-                            val text = matches[0]
-                            onTtsInputChange(text)
-                            handleSpeechResult(text)
-                        }
-                    }
-                    override fun onPartialResults(partialResults: Bundle?) { }
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
+    fun completeFirstRun(source: LanguageOption, target: LanguageOption) {
+        val selected = listOf(source, target).distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT)
+        persistFreeLanguages(selected)
+        prefs.edit()
+            .putBoolean(PREF_IS_FIRST_RUN, false)
+            .putString(PREF_SOURCE_LANG_CODE, source.code)
+            .putString(PREF_TARGET_LANG_CODE, target.code)
+            .apply()
+
+        _isFirstRun.value = false
+        _translateSourceLang.value = source
+        _translateTargetLang.value = target
+
+        viewModelScope.launch {
+            _uiMessage.emit("Downloading your selected language packs.")
+            selected.forEach { lang ->
+                if (packDao.getByCode(lang.mlKitCode)?.status != PackStatus.DOWNLOADED) {
+                    runCatching { packRepo.downloadPack(lang.mlKitCode, requireWifi = false) }
+                }
+            }
+            downloader.warmUp(source.mlKitCode, target.mlKitCode)
+            reconcileFreeLanguagesWithCurrentState()
+        }
+    }
+
+    fun observePackStatus(mlKitCode: String): Flow<LanguagePackEntity?> = packRepo.observePack(mlKitCode)
+
+    fun isFreePlan(): Boolean = !isPremium.value
+
+    fun canOpenLanguagePicker(): Boolean = isPremium.value
+
+    fun isFreeLanguage(lang: LanguageOption): Boolean {
+        return _freePlanLanguages.value.any { it.code == lang.code }
+    }
+
+    fun getSelectableSourceLanguages(): List<LanguageOption> {
+        return if (isPremium.value) {
+            listOf(AUTO_DETECT_OPTION) + SUPPORTED_LANGUAGES
+        } else {
+            _freePlanLanguages.value
+        }
+    }
+
+    fun getSelectableTargetLanguages(): List<LanguageOption> {
+        return if (isPremium.value) {
+            SUPPORTED_LANGUAGES
+        } else {
+            _freePlanLanguages.value
+        }
+    }
+
+    fun launchPremiumPurchase(activity: Activity): Boolean {
+        return billingRepo.launchPurchase(activity)
+    }
+
+    fun refreshPremiumState() {
+        billingRepo.refreshPurchases()
+    }
+
+    fun setThemeMode(themeMode: AppThemeMode) {
+        AppSettingsManager.saveThemeMode(getApplication(), themeMode)
+        _themeMode.value = themeMode
+    }
+
+    fun setAppLanguage(languageTag: String) {
+        AppSettingsManager.saveAppLanguage(getApplication(), languageTag)
+        _appLanguageTag.value = languageTag
+    }
+
+    fun remainingFreeWords(): Int = (FREE_WORD_LIMIT - _freeWordsUsed.value).coerceAtLeast(0)
+
+    fun shouldShowAds(): Boolean = !isPremium.value
+
+    fun shouldShowBannerAd(): Boolean = !isPremium.value
+
+    fun canDownloadPack(mlKitCode: String): Boolean {
+        if (isPremium.value) return true
+        val downloadedCodes = allPacks.value
+            .filter { it.status == PackStatus.DOWNLOADED }
+            .map { it.mlKitCode }
+            .toSet()
+        return downloadedCodes.contains(mlKitCode) || downloadedCodes.size < FREE_LANGUAGE_LIMIT
+    }
+
+    fun setLiveCameraMode(enabled: Boolean) {
+        _isLiveCameraMode.value = enabled
+    }
+
+    fun onTranslateInputChange(text: String) {
+        _translateInput.value = text
+        _translatedText.value = ""
+        _translateError.value = null
+        _translateSource.value = TranslateSource.NONE
+        _detectedLanguage.value = null
+    }
+
+    fun setTranslateSourceLang(lang: LanguageOption) {
+        val safeLang = sanitizeSourceLanguage(lang)
+        _translateSourceLang.value = safeLang
+        _translatedText.value = ""
+        _translateSource.value = TranslateSource.NONE
+        _detectedLanguage.value = null
+        prefs.edit().putString(PREF_SOURCE_LANG_CODE, safeLang.code).apply()
+
+        viewModelScope.launch {
+            val tgt = _translateTargetLang.value
+            if (safeLang != AUTO_DETECT_OPTION && canWarmUp(safeLang.mlKitCode, tgt.mlKitCode)) {
+                downloader.warmUp(safeLang.mlKitCode, tgt.mlKitCode)
             }
         }
     }
 
-    // ── Speech actions ────────────────────────────────────────────────────────
+    fun setTranslateTargetLang(lang: LanguageOption) {
+        val safeLang = sanitizeTargetLanguage(lang)
+        _translateTargetLang.value = safeLang
+        _translatedText.value = ""
+        _translateSource.value = TranslateSource.NONE
+        prefs.edit().putString(PREF_TARGET_LANG_CODE, safeLang.code).apply()
+
+        viewModelScope.launch {
+            val src = _translateSourceLang.value
+            val srcCode = if (src == AUTO_DETECT_OPTION) TranslateLanguage.ENGLISH else src.mlKitCode
+            if (canWarmUp(srcCode, safeLang.mlKitCode)) {
+                downloader.warmUp(srcCode, safeLang.mlKitCode)
+            }
+        }
+    }
+
+    fun swapTranslateLanguages() {
+        val src = _translateSourceLang.value
+        val tgt = _translateTargetLang.value
+        if (src == AUTO_DETECT_OPTION) return
+
+        val input = _translateInput.value
+        val output = _translatedText.value
+        setTranslateSourceLang(tgt)
+        setTranslateTargetLang(src)
+
+        if (output.isNotBlank()) {
+            _translateInput.value = output
+            _translatedText.value = input
+        }
+    }
+
+    fun translate() {
+        val rawText = _translateInput.value
+        val text = rawText.trim()
+        if (text.isBlank()) {
+            _translatedText.value = ""
+            return
+        }
+
+        translateJob?.cancel()
+        translateJob = viewModelScope.launch {
+            _translateLoading.value = true
+            _translateError.value = null
+            _translateSource.value = TranslateSource.NONE
+
+            try {
+                val src = resolveSourceLanguage(text)
+                val tgt = sanitizeTargetLanguage(_translateTargetLang.value)
+                val cached = historyDao.findInHistory(text, src.code, tgt.code)
+
+                if (cached != null) {
+                    _translatedText.value = cached.translatedText
+                    _translateSource.value = TranslateSource.HISTORY
+                    historyDao.touch(cached.id)
+                    registerTranslationAction()
+                    return@launch
+                }
+
+                if (!isPremium.value) {
+                    ensureFreePlanAllowsLanguagePair(src, tgt)
+                    ensureFreeWordLimit(text, src, tgt)
+                }
+
+                val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
+                val isOnline = ConnectivityHelper.isOnline(getApplication())
+
+                when {
+                    packsReady -> {
+                        val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
+                        _translatedText.value = result
+                        _translateSource.value = TranslateSource.OFFLINE
+                        saveHistoryIfNeeded(text, result, src, tgt)
+                        markWordsUsedIfNeeded(text, src, tgt)
+                        registerTranslationAction()
+                    }
+                    isOnline -> {
+                        val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
+                        _translatedText.value = result
+                        _translateSource.value = TranslateSource.ONLINE
+                        saveHistoryIfNeeded(text, result, src, tgt)
+                        markWordsUsedIfNeeded(text, src, tgt)
+                        registerTranslationAction()
+                    }
+                    else -> {
+                        _translateError.value = buildOfflineError(src, tgt)
+                    }
+                }
+            } catch (e: Exception) {
+                _translateError.value = e.message ?: "Translation failed."
+            } finally {
+                _translateLoading.value = false
+            }
+        }
+    }
+
+    fun translateFromPrimaryAction() {
+        translate()
+    }
 
     fun startRecording() {
+        if (!isPremium.value) {
+            viewModelScope.launch {
+                _uiMessage.emit("Speech input is available in Premium.")
+            }
+            return
+        }
         val currentSource = _translateSourceLang.value
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -299,6 +466,197 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         stopSpeaking()
     }
 
+    fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
+        viewModelScope.launch {
+            if (!canDownloadPack(mlKitCode)) {
+                _uiMessage.emit("You are using the free plan. Delete one language or upgrade for more languages.")
+                return@launch
+            }
+
+            _downloadingPacks.value = _downloadingPacks.value + mlKitCode
+            try {
+                packRepo.downloadPack(mlKitCode, requireWifi)
+                val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
+                _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
+                reconcileFreeLanguagesWithCurrentState()
+            } catch (e: Exception) {
+                _uiMessage.emit("Download failed: ${e.message}")
+            } finally {
+                _downloadingPacks.value = _downloadingPacks.value - mlKitCode
+            }
+        }
+    }
+
+    fun deletePack(mlKitCode: String) {
+        viewModelScope.launch {
+            packRepo.deletePack(mlKitCode)
+            val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
+            _uiMessage.emit("${lang?.displayName ?: mlKitCode} removed.")
+            reconcileFreeLanguagesWithCurrentState()
+        }
+    }
+
+    fun refreshPackStatus() {
+        viewModelScope.launch {
+            packRepo.reconcileWithMlKit()
+            reconcileFreeLanguagesWithCurrentState()
+        }
+    }
+
+    fun onTtsInputChange(text: String) {}
+
+    fun speakText(text: String, langCode: String) {
+        if (!_ttsReady.value || text.isBlank()) return
+        val result = tts?.setLanguage(Locale.forLanguageTag(langCode))
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            tts?.language = Locale.ENGLISH
+        }
+        tts?.stop()
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
+    }
+
+    fun stopSpeaking() {
+        tts?.stop()
+        _isSpeaking.value = false
+    }
+
+    fun setOcrBitmap(bitmap: Bitmap) {
+        recognizeText(bitmap)
+    }
+
+    private fun recognizeText(bitmap: Bitmap) {
+        viewModelScope.launch {
+            _ocrLoading.value = true
+            try {
+                val extracted = runOcr(bitmap)
+                _ocrText.value = extracted
+                if (extracted.isNotBlank()) {
+                    translateOcrText(extracted)
+                }
+            } finally {
+                _ocrLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun translateOcrText(text: String) {
+        val target = _translateTargetLang.value
+        try {
+            val result = downloader.translateOnline(text, TranslateLanguage.ENGLISH, target.mlKitCode)
+            _ocrTranslatedText.value = result
+        } catch (e: Exception) {
+            Log.e(TAG, "OCR Translation failed", e)
+        }
+    }
+
+    private suspend fun runOcr(bitmap: Bitmap): String = suspendCancellableCoroutine { cont ->
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val image = InputImage.fromBitmap(bitmap, 0)
+        recognizer.process(image)
+            .addOnSuccessListener { result ->
+                cont.resume(result.text)
+                recognizer.close()
+            }
+            .addOnFailureListener { e ->
+                cont.cancel(e)
+                recognizer.close()
+            }
+    }
+
+    fun clearOcr() {
+        _ocrText.value = ""
+        _ocrTranslatedText.value = ""
+    }
+
+    fun setHistoryFilter(filter: HistoryFilter) {
+        _historyFilter.value = filter
+    }
+
+    fun setHistorySearchQuery(q: String) {
+        _historySearchQuery.value = q
+    }
+
+    fun toggleFavorite(entry: TranslationHistoryEntity) {
+        viewModelScope.launch { historyDao.setFavorite(entry.id, !entry.isFavorite) }
+    }
+
+    fun deleteHistoryEntry(entry: TranslationHistoryEntity) {
+        viewModelScope.launch { historyDao.delete(entry) }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch { historyDao.clearNonFavorites() }
+    }
+
+    fun restoreFromHistory(entry: TranslationHistoryEntity) {
+        setTranslateSourceLang(SUPPORTED_LANGUAGES.find { it.code == entry.sourceLangCode } ?: _freePlanLanguages.value.first())
+        setTranslateTargetLang(SUPPORTED_LANGUAGES.find { it.code == entry.targetLangCode } ?: _freePlanLanguages.value.last())
+        _translateInput.value = entry.sourceText
+        _translatedText.value = entry.translatedText
+        _translateSource.value = TranslateSource.HISTORY
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        tts?.shutdown()
+        speechRecognizer?.destroy()
+        billingRepo.endConnection()
+    }
+
+    private fun initTts(application: Application) {
+        tts = TextToSpeech(application) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                _ttsReady.value = true
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        _isSpeaking.value = true
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        _isSpeaking.value = false
+                    }
+
+                    override fun onError(utteranceId: String?) {
+                        _isSpeaking.value = false
+                    }
+                })
+            }
+        }
+    }
+
+    private fun initSpeechRecognizer(application: Application) {
+        if (!SpeechRecognizer.isRecognitionAvailable(application)) return
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    _isRecording.value = true
+                }
+
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    _isRecording.value = false
+                }
+
+                override fun onError(error: Int) {
+                    _isRecording.value = false
+                    Log.e(TAG, "Speech recognition error: $error")
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    if (!matches.isNullOrEmpty()) {
+                        handleSpeechResult(matches.first())
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+    }
+
     private fun handleSpeechResult(text: String) {
         _translateInput.value = text
         if (_translateSourceLang.value != AUTO_DETECT_OPTION) {
@@ -313,193 +671,87 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .build()
         val languageIdentifier = LanguageIdentification.getClient(options)
         languageIdentifier.identifyLanguage(text)
-            .addOnSuccessListener { 
+            .addOnSuccessListener {
                 cont.resume(it)
                 languageIdentifier.close()
             }
-            .addOnFailureListener { 
+            .addOnFailureListener {
                 cont.resume("und")
                 languageIdentifier.close()
             }
     }
 
-    private suspend fun identifyPossibleLanguagesSuspend(text: String): List<IdentifiedLanguage> = suspendCancellableCoroutine { cont ->
-        val options = LanguageIdentificationOptions.Builder()
-            .setConfidenceThreshold(0.01f)
-            .build()
-        val languageIdentifier = LanguageIdentification.getClient(options)
-        languageIdentifier.identifyPossibleLanguages(text)
-            .addOnSuccessListener { 
-                cont.resume(it)
-                languageIdentifier.close()
+    private suspend fun identifyPossibleLanguagesSuspend(text: String): List<IdentifiedLanguage> =
+        suspendCancellableCoroutine { cont ->
+            val options = LanguageIdentificationOptions.Builder()
+                .setConfidenceThreshold(0.01f)
+                .build()
+            val languageIdentifier = LanguageIdentification.getClient(options)
+            languageIdentifier.identifyPossibleLanguages(text)
+                .addOnSuccessListener {
+                    cont.resume(it)
+                    languageIdentifier.close()
+                }
+                .addOnFailureListener {
+                    cont.resume(emptyList())
+                    languageIdentifier.close()
+                }
+        }
+
+    private suspend fun resolveSourceLanguage(text: String): LanguageOption {
+        return if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
+            val detectedCode = identifyLanguageSuspend(text)
+            var detected = if (detectedCode != "und") {
+                SUPPORTED_LANGUAGES.find {
+                    detectedCode == it.code || detectedCode.startsWith(it.code + "-")
+                }
+            } else {
+                null
             }
-            .addOnFailureListener { 
-                cont.resume(emptyList())
-                languageIdentifier.close()
-            }
-    }
 
-    // ── Translate actions ─────────────────────────────────────────────────────
-
-    fun onTranslateInputChange(text: String) {
-        _translateInput.value = text
-        _translatedText.value = ""
-        _translateError.value = null
-        _translateSource.value = TranslateSource.NONE
-        _detectedLanguage.value = null
-    }
-
-    fun setTranslateSourceLang(lang: LanguageOption) {
-        _translateSourceLang.value = lang
-        _translatedText.value = ""
-        _translateSource.value = TranslateSource.NONE
-        _detectedLanguage.value = null
-        
-        prefs.edit().putString("source_lang_code", lang.code).apply()
-
-        if (lang != AUTO_DETECT_OPTION) {
-            viewModelScope.launch {
-                val srcReady = packDao.getByCode(lang.mlKitCode)?.status == PackStatus.DOWNLOADED
-                val tgtReady = packDao.getByCode(_translateTargetLang.value.mlKitCode)?.status == PackStatus.DOWNLOADED
-                if (_isPremium.value || (srcReady && tgtReady)) {
-                    downloader.warmUp(lang.mlKitCode, _translateTargetLang.value.mlKitCode)
+            if (detected == null) {
+                val possible = identifyPossibleLanguagesSuspend(text)
+                for (p in possible) {
+                    val found = SUPPORTED_LANGUAGES.find {
+                        p.languageTag == it.code || p.languageTag.startsWith(it.code + "-")
+                    }
+                    if (found != null) {
+                        detected = found
+                        break
+                    }
                 }
             }
-        }
-    }
 
-    fun setTranslateTargetLang(lang: LanguageOption) {
-        _translateTargetLang.value = lang
-        _translatedText.value = ""
-        _translateSource.value = TranslateSource.NONE
-        
-        prefs.edit().putString("target_lang_code", lang.code).apply()
-
-        viewModelScope.launch {
-            val src = _translateSourceLang.value
-            val srcCode = if (src == AUTO_DETECT_OPTION) TranslateLanguage.ENGLISH else src.mlKitCode
-            val srcReady = packDao.getByCode(srcCode)?.status == PackStatus.DOWNLOADED
-            val tgtReady = packDao.getByCode(lang.mlKitCode)?.status == PackStatus.DOWNLOADED
-            
-            if (_isPremium.value || (srcReady && tgtReady)) {
-                downloader.warmUp(srcCode, lang.mlKitCode)
+            val safeDetected = detected ?: _freePlanLanguages.value.firstOrNull() ?: SUPPORTED_LANGUAGES.first()
+            _detectedLanguage.value = safeDetected
+            if (!isPremium.value && !isFreeLanguage(safeDetected)) {
+                _freePlanLanguages.value.firstOrNull() ?: safeDetected
+            } else {
+                safeDetected
             }
+        } else {
+            sanitizeSourceLanguage(_translateSourceLang.value)
         }
     }
 
-    fun swapTranslateLanguages() {
-        val src = _translateSourceLang.value
-        val tgt = _translateTargetLang.value
-        if (src == AUTO_DETECT_OPTION) return // Cannot swap if source is auto-detect
-        
-        setTranslateSourceLang(tgt)
-        setTranslateTargetLang(src)
-
-        val input  = _translateInput.value
-        val output = _translatedText.value
-        if (output.isNotBlank()) {
-            _translateInput.value  = output
-            _translatedText.value  = input
-        }
+    private suspend fun canWarmUp(sourceMlKitCode: String, targetMlKitCode: String): Boolean {
+        val srcReady = packDao.getByCode(sourceMlKitCode)?.status == PackStatus.DOWNLOADED
+        val tgtReady = packDao.getByCode(targetMlKitCode)?.status == PackStatus.DOWNLOADED
+        return isPremium.value || (srcReady && tgtReady)
     }
 
-    private var translateJob: Job? = null
-    fun translate() {
-        val text = _translateInput.value.trim()
-        if (text.isBlank()) {
-            _translatedText.value = ""
+    private suspend fun saveHistoryIfNeeded(
+        text: String,
+        result: String,
+        src: LanguageOption,
+        tgt: LanguageOption
+    ) {
+        val existing = historyDao.findExactHistoryEntry(text, result, src.code, tgt.code)
+        if (existing != null) {
+            historyDao.touch(existing.id)
             return
         }
 
-        translateJob?.cancel()
-        translateJob = viewModelScope.launch {
-            _translateLoading.value = true
-            _translateError.value   = null
-            _translateSource.value  = TranslateSource.NONE
-
-            try {
-                val src = if (_translateSourceLang.value == AUTO_DETECT_OPTION) {
-                    val detectedCode = identifyLanguageSuspend(text)
-                    var detected = if (detectedCode != "und") {
-                        SUPPORTED_LANGUAGES.find { 
-                            detectedCode == it.code || detectedCode.startsWith(it.code + "-") 
-                        }
-                    } else null
-                    
-                    if (detected == null) {
-                        val possible = identifyPossibleLanguagesSuspend(text)
-                        for (p in possible) {
-                            val found = SUPPORTED_LANGUAGES.find { 
-                                p.languageTag == it.code || p.languageTag.startsWith(it.code + "-") 
-                            }
-                            if (found != null) {
-                                detected = found
-                                break
-                            }
-                        }
-                    }
-
-                    _detectedLanguage.value = detected
-                    detected ?: SUPPORTED_LANGUAGES[0]
-                } else {
-                    _translateSourceLang.value
-                }
-
-                val tgt = _translateTargetLang.value
-
-                val packsReady = packRepo.areBothPacksReady(src.mlKitCode, tgt.mlKitCode)
-                val isOnline   = ConnectivityHelper.isOnline(getApplication())
-
-                when {
-                    packsReady -> {
-                        val result = downloader.translateOffline(text, src.mlKitCode, tgt.mlKitCode)
-                        _translatedText.value  = result
-                        _translateSource.value = TranslateSource.OFFLINE
-                        saveHistory(text, result, src, tgt)
-                    }
-                    isOnline -> {
-                        // Plan limit check: if premium, no limit.
-                        // If free, must have room for BOTH models if they aren't already downloaded.
-                        if (!_isPremium.value) {
-                            val downloaded = allPacks.value.filter { it.status == PackStatus.DOWNLOADED }.map { it.mlKitCode }.toSet()
-                            val needed = mutableListOf<String>()
-                            if (!downloaded.contains(src.mlKitCode)) needed.add(src.mlKitCode)
-                            if (!downloaded.contains(tgt.mlKitCode)) needed.add(tgt.mlKitCode)
-                            
-                            if (downloaded.size + needed.size > 2) {
-                                _translateError.value = "Free plan limit: Max 2 offline models. Delete a pack to use ${src.displayName} or ${tgt.displayName}."
-                                return@launch
-                            }
-                        }
-
-                        val result = downloader.translateOnline(text, src.mlKitCode, tgt.mlKitCode)
-                        _translatedText.value  = result
-                        _translateSource.value = TranslateSource.ONLINE
-                        saveHistory(text, result, src, tgt)
-                    }
-                    else -> {
-                        val cached = historyDao.findInHistory(text, src.code, tgt.code)
-                        if (cached != null) {
-                            _translatedText.value  = cached.translatedText
-                            _translateSource.value = TranslateSource.HISTORY
-                        } else {
-                            _translateError.value = buildOfflineError(src, tgt)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                _translateError.value = "Translation failed: ${e.message}"
-            } finally {
-                _translateLoading.value = false
-            }
-        }
-    }
-
-    private fun buildOfflineError(src: LanguageOption, tgt: LanguageOption): String {
-        return "You're offline and \"${src.displayName} → ${tgt.displayName}\" pack isn't downloaded."
-    }
-
-    private suspend fun saveHistory(text: String, result: String, src: LanguageOption, tgt: LanguageOption) {
         historyDao.insert(
             TranslationHistoryEntity(
                 sourceText = text,
@@ -512,134 +764,147 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    // ── Language pack actions ─────────────────────────────────────────────────
+    private fun markWordsUsedIfNeeded(text: String, src: LanguageOption, tgt: LanguageOption) {
+        if (isPremium.value) return
+        val key = translationUsageKey(text, src, tgt)
+        val counted = prefs.getStringSet(PREF_COUNTED_TRANSLATION_KEYS, emptySet()).orEmpty().toMutableSet()
+        if (counted.contains(key)) return
 
-    fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
-        viewModelScope.launch {
-            val downloadedCount = allPacks.value.count { it.status == PackStatus.DOWNLOADED }
-            if (!_isPremium.value && downloadedCount >= 2) {
-                _uiMessage.emit("Free plan limit: Max 2 offline models.")
-                return@launch
+        counted.add(key)
+        val newTotal = _freeWordsUsed.value + countWords(text)
+        prefs.edit()
+            .putInt(PREF_FREE_WORDS_USED, newTotal)
+            .putStringSet(PREF_COUNTED_TRANSLATION_KEYS, counted)
+            .apply()
+        _freeWordsUsed.value = newTotal
+    }
+
+    private suspend fun ensureFreeWordLimit(text: String, src: LanguageOption, tgt: LanguageOption) {
+        val key = translationUsageKey(text, src, tgt)
+        val counted = prefs.getStringSet(PREF_COUNTED_TRANSLATION_KEYS, emptySet()).orEmpty()
+        if (counted.contains(key)) return
+
+        val prospectiveTotal = _freeWordsUsed.value + countWords(text)
+        if (prospectiveTotal > FREE_WORD_LIMIT) {
+            throw IllegalStateException("Free plan limit reached. Upgrade for unlimited translations.")
+        }
+    }
+
+    private suspend fun ensureFreePlanAllowsLanguagePair(src: LanguageOption, tgt: LanguageOption) {
+        val allowed = _freePlanLanguages.value.map { it.code }.toSet()
+        if (src.code !in allowed || tgt.code !in allowed) {
+            throw IllegalStateException("Free plan supports only your two selected languages.")
+        }
+    }
+
+    private suspend fun registerTranslationAction() {
+        val nextValue = _translateActions.value + 1
+        prefs.edit().putInt(PREF_TRANSLATE_ACTIONS, nextValue).apply()
+        _translateActions.value = nextValue
+        if (!isPremium.value && nextValue % AD_FREQUENCY == 0) {
+            _showInterstitialAd.emit(Unit)
+        }
+    }
+
+    private fun buildOfflineError(src: LanguageOption, tgt: LanguageOption): String {
+        return "You're offline and the ${src.displayName} to ${tgt.displayName} packs are not ready."
+    }
+
+    private fun countWords(text: String): Int {
+        return Regex("\\S+").findAll(text.trim()).count()
+    }
+
+    private fun translationUsageKey(text: String, src: LanguageOption, tgt: LanguageOption): String {
+        return "${src.code}|${tgt.code}|${text.trim().lowercase(Locale.getDefault())}"
+    }
+
+    private fun reconcileFreeLanguagesWithCurrentState() {
+        if (isPremium.value) return
+
+        val downloaded = allPacks.value
+            .filter { it.status == PackStatus.DOWNLOADED }
+            .mapNotNull { pack -> SUPPORTED_LANGUAGES.find { it.mlKitCode == pack.mlKitCode } }
+            .distinctBy { it.code }
+
+        val persisted = loadPersistedFreeLanguages()
+        val chosen = when {
+            downloaded.size >= FREE_LANGUAGE_LIMIT -> downloaded.take(FREE_LANGUAGE_LIMIT)
+            persisted.isNotEmpty() -> persisted.take(FREE_LANGUAGE_LIMIT)
+            else -> SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT)
+        }
+
+        persistFreeLanguages(chosen)
+        if (chosen.isNotEmpty()) {
+            if (!isFreeLanguage(_translateSourceLang.value)) {
+                _translateSourceLang.value = chosen.first()
             }
-
-            _downloadingPacks.value = _downloadingPacks.value + mlKitCode
-            try {
-                packRepo.downloadPack(mlKitCode, requireWifi)
-                val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-                _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
-            } catch (e: Exception) {
-                _uiMessage.emit("Download failed: ${e.message}")
-            } finally {
-                _downloadingPacks.value = _downloadingPacks.value - mlKitCode
+            if (!isFreeLanguage(_translateTargetLang.value) || _translateTargetLang.value == _translateSourceLang.value) {
+                _translateTargetLang.value = chosen.getOrElse(1) { chosen.first() }
             }
+            prefs.edit()
+                .putString(PREF_SOURCE_LANG_CODE, _translateSourceLang.value.code)
+                .putString(PREF_TARGET_LANG_CODE, _translateTargetLang.value.code)
+                .apply()
         }
     }
 
-    fun deletePack(mlKitCode: String) {
-        viewModelScope.launch {
-            packRepo.deletePack(mlKitCode)
-            val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-            _uiMessage.emit("${lang?.displayName ?: mlKitCode} removed.")
+    private fun persistFreeLanguages(languages: List<LanguageOption>) {
+        val codes = languages.distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT).map { it.code }.toSet()
+        prefs.edit().putStringSet(PREF_FREE_LANGUAGE_CODES, codes).apply()
+        _freePlanLanguages.value = codes.mapNotNull { code ->
+            SUPPORTED_LANGUAGES.find { it.code == code }
+        }.ifEmpty { SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT) }
+    }
+
+    private fun loadPersistedFreeLanguages(): List<LanguageOption> {
+        val codes = prefs.getStringSet(PREF_FREE_LANGUAGE_CODES, emptySet()).orEmpty().toList()
+        return codes.mapNotNull { code -> SUPPORTED_LANGUAGES.find { it.code == code } }
+    }
+
+    private fun loadInitialFreeLanguages(): List<LanguageOption> {
+        val persisted = loadPersistedFreeLanguages()
+        if (persisted.isNotEmpty()) return persisted
+        val source = prefs.getString(PREF_SOURCE_LANG_CODE, SUPPORTED_LANGUAGES.first().code)
+        val target = prefs.getString(PREF_TARGET_LANG_CODE, SUPPORTED_LANGUAGES.getOrNull(1)?.code ?: SUPPORTED_LANGUAGES.first().code)
+        return listOfNotNull(
+            SUPPORTED_LANGUAGES.find { it.code == source },
+            SUPPORTED_LANGUAGES.find { it.code == target }
+        ).distinctBy { it.code }.ifEmpty { SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT) }
+    }
+
+    private fun loadInitialSourceLanguage(): LanguageOption {
+        val persisted = prefs.getString(PREF_SOURCE_LANG_CODE, null)
+        val preferred = SUPPORTED_LANGUAGES.find { it.code == persisted }
+        return if (!isPremium.value && preferred != null && !loadInitialFreeLanguages().any { it.code == preferred.code }) {
+            loadInitialFreeLanguages().first()
+        } else {
+            preferred ?: loadInitialFreeLanguages().first()
         }
     }
 
-    fun refreshPackStatus() {
-        viewModelScope.launch { packRepo.reconcileWithMlKit() }
-    }
-
-    // ── TTS actions ───────────────────────────────────────────────────────────
-
-    fun onTtsInputChange(text: String) { _ttsInput.value = text }
-    fun setTtsLanguage(lang: LanguageOption) { _ttsLanguage.value = lang }
-
-    fun speakText(text: String, langCode: String) {
-        if (!_ttsReady.value || text.isBlank()) return
-        val result = tts?.setLanguage(Locale.forLanguageTag(langCode))
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            tts?.language = Locale.ENGLISH
-        }
-        tts?.stop()
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utt_${System.currentTimeMillis()}")
-    }
-
-    fun stopSpeaking() { tts?.stop(); _isSpeaking.value = false }
-
-    // ── OCR actions ───────────────────────────────────────────────────────────
-
-    fun setOcrBitmap(bitmap: Bitmap) {
-        recognizeText(bitmap)
-    }
-
-    fun setOcrTtsLanguage(lang: LanguageOption) { _ocrTtsLanguage.value = lang }
-
-    private fun recognizeText(bitmap: Bitmap) {
-        viewModelScope.launch {
-            _ocrLoading.value = true
-            try {
-                val extracted = runOcr(bitmap)
-                _ocrText.value = extracted
-                
-                // Automatically translate the extracted text
-                if (extracted.isNotBlank()) {
-                    translateOcrText(extracted)
-                }
-            } finally {
-                _ocrLoading.value = false
-            }
+    private fun loadInitialTargetLanguage(): LanguageOption {
+        val persisted = prefs.getString(PREF_TARGET_LANG_CODE, null)
+        val preferred = SUPPORTED_LANGUAGES.find { it.code == persisted }
+        return if (!isPremium.value && preferred != null && !loadInitialFreeLanguages().any { it.code == preferred.code }) {
+            loadInitialFreeLanguages().getOrElse(1) { loadInitialFreeLanguages().first() }
+        } else {
+            preferred ?: loadInitialFreeLanguages().getOrElse(1) { loadInitialFreeLanguages().first() }
         }
     }
 
-    private suspend fun translateOcrText(text: String) {
-        val target = _translateTargetLang.value
-        try {
-            // Using auto-detect logic or assuming English as base
-            val result = downloader.translateOnline(text, TranslateLanguage.ENGLISH, target.mlKitCode)
-            _ocrTranslatedText.value = result
-        } catch (e: Exception) {
-            Log.e("AppViewModel", "OCR Translation failed", e)
+    private fun sanitizeSourceLanguage(lang: LanguageOption): LanguageOption {
+        return if (isPremium.value) {
+            lang
+        } else {
+            _freePlanLanguages.value.find { it.code == lang.code } ?: _freePlanLanguages.value.first()
         }
     }
 
-    private suspend fun runOcr(bitmap: Bitmap): String = suspendCancellableCoroutine { cont ->
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        val image = InputImage.fromBitmap(bitmap, 0)
-        recognizer.process(image)
-            .addOnSuccessListener { result -> cont.resume(result.text); recognizer.close() }
-            .addOnFailureListener { e -> cont.cancel(e); recognizer.close() }
-    }
-
-    fun clearOcr() { 
-        _ocrText.value = ""
-        _ocrTranslatedText.value = ""
-    }
-
-    // ── History actions ───────────────────────────────────────────────────────
-
-    fun setHistoryFilter(filter: HistoryFilter) { _historyFilter.value = filter }
-    fun setHistorySearchQuery(q: String) { _historySearchQuery.value = q }
-
-    fun toggleFavorite(entry: TranslationHistoryEntity) {
-        viewModelScope.launch { historyDao.setFavorite(entry.id, !entry.isFavorite) }
-    }
-
-    fun deleteHistoryEntry(entry: TranslationHistoryEntity) {
-        viewModelScope.launch { historyDao.delete(entry) }
-    }
-
-    fun clearHistory() { viewModelScope.launch { historyDao.clearNonFavorites() } }
-
-    fun restoreFromHistory(entry: TranslationHistoryEntity) {
-        _translateInput.value      = entry.sourceText
-        _translatedText.value      = entry.translatedText
-        _translateSourceLang.value = SUPPORTED_LANGUAGES.find { it.code == entry.sourceLangCode } ?: SUPPORTED_LANGUAGES[0]
-        _translateTargetLang.value = SUPPORTED_LANGUAGES.find { it.code == entry.targetLangCode } ?: SUPPORTED_LANGUAGES[1]
-    }
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    override fun onCleared() {
-        super.onCleared()
-        tts?.shutdown()
-        speechRecognizer?.destroy()
+    private fun sanitizeTargetLanguage(lang: LanguageOption): LanguageOption {
+        return if (isPremium.value) {
+            lang
+        } else {
+            _freePlanLanguages.value.find { it.code == lang.code } ?: _freePlanLanguages.value.getOrElse(1) { _freePlanLanguages.value.first() }
+        }
     }
 }

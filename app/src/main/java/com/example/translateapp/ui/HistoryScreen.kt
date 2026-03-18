@@ -158,6 +158,7 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
                         onDelete = { vm.deleteHistoryEntry(entry) },
                         onRestore = {
                             vm.restoreFromHistory(entry)
+                            onRestore()
                         },
                         modifier = Modifier.animateItemPlacement(tween(200))
                     )

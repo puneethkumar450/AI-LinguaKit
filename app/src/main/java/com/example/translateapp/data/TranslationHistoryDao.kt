@@ -26,8 +26,27 @@ interface TranslationHistoryDao {
         targetLangCode: String
     ): TranslationHistoryEntity?
 
+    @Query("""
+        SELECT * FROM translation_history
+        WHERE LOWER(TRIM(sourceText)) = LOWER(TRIM(:sourceText))
+          AND LOWER(TRIM(translatedText)) = LOWER(TRIM(:translatedText))
+          AND sourceLangCode = :sourceLangCode
+          AND targetLangCode = :targetLangCode
+        ORDER BY timestampMs DESC
+        LIMIT 1
+    """)
+    suspend fun findExactHistoryEntry(
+        sourceText: String,
+        translatedText: String,
+        sourceLangCode: String,
+        targetLangCode: String
+    ): TranslationHistoryEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: TranslationHistoryEntity): Long
+
+    @Query("UPDATE translation_history SET timestampMs = :timestampMs WHERE id = :id")
+    suspend fun touch(id: Long, timestampMs: Long = System.currentTimeMillis())
 
     @Query("UPDATE translation_history SET isFavorite = :isFav WHERE id = :id")
     suspend fun setFavorite(id: Long, isFav: Boolean)
