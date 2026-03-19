@@ -7,8 +7,8 @@
     <string name="enter_text_placeholder">Enter text</string>
     <string name="settings_title">Settings</string>
     <string name="language_change_title">Change app language</string>
-    <string name="choose_two_languages">Choose 2 Languages</string>
-    <string name="selected_count_template">%1$d/2</string>
+    <string name="choose_two_languages">Choose 3 Languages</string>
+    <string name="selected_count_template">%1$d/3</string>
     <string name="swap_translation_pair">Swap input and result</string>
 
     <string name="advertisement_title">Advertisement</string>
@@ -18,7 +18,7 @@
     <string name="choose_your_plan">Choose your plan</string>
     <string name="plan_free_title">Free</string>
     <string name="plan_free_subtitle">Good for getting started</string>
-    <string name="plan_point_free_languages">2 downloaded languages</string>
+    <string name="plan_point_free_languages">3 downloaded languages</string>
     <string name="plan_point_free_words">5,000 translated words</string>
     <string name="plan_point_free_ads">Banner ads and ad breaks</string>
     <string name="plan_point_free_manual">Manual text translation</string>
@@ -65,4 +65,6 @@
 
     <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
     <string name="admob_banner_unit_id" translatable="false">ca-app-pub-3940256099942544/9214589741</string>
+
+    <string name="search_languages">Search languages…</string>
 </resources>

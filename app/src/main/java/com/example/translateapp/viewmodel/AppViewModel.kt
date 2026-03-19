@@ -474,7 +474,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            _downloadingPacks.value = _downloadingPacks.value + mlKitCode
+            _downloadingPacks.value += mlKitCode
             try {
                 packRepo.downloadPack(mlKitCode, requireWifi)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
@@ -800,7 +800,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun registerTranslationAction() {
         val nextValue = _translateActions.value + 1
-        prefs.edit().putInt(PREF_TRANSLATE_ACTIONS, nextValue).apply()
+        prefs.edit { putInt(PREF_TRANSLATE_ACTIONS, nextValue) }
         _translateActions.value = nextValue
         if (!isPremium.value && nextValue % AD_FREQUENCY == 0) {
             _showInterstitialAd.emit(Unit)

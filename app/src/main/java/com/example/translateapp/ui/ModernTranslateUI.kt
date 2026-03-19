@@ -382,93 +382,8 @@ private fun LinearLoadingRow() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguagePickerScreen(
-    title: String,
-    selected: LanguageOption,
-    options: List<LanguageOption>,
-    downloadedCodes: Set<String> = emptySet(),
-    onSelect: (LanguageOption) -> Unit,
-    onBack: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title, color = Color.Black) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.Black)
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        var searchQuery by remember { mutableStateOf("") }
-        val filteredOptions = remember(searchQuery, options) {
-            if (searchQuery.isBlank()) options
-            else options.filter { it.displayName.contains(searchQuery, ignoreCase = true) }
-        }
-
-        val (downloaded, others) = remember(filteredOptions, downloadedCodes) {
-            filteredOptions.partition { downloadedCodes.contains(it.mlKitCode) || it.mlKitCode == "auto" }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                placeholder = { Text("Search languages...", color = Color.Gray) },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF1F3F9),
-                    unfocusedContainerColor = Color(0xFFF1F3F9),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                if (downloaded.isNotEmpty()) {
-                    item { SectionHeaderTitle("Downloaded Packs") }
-                    items(downloaded) { lang ->
-                        LanguageItem(
-                            lang = lang,
-                            selected = selected,
-                            enabled = true,
-                            supportingText = "Ready to use",
-                            onSelect = onSelect
-                        )
-                    }
-                }
-
-                if (others.isNotEmpty()) {
-                    item { SectionHeaderTitle("Other Languages") }
-                    items(others) { lang ->
-                        LanguageItem(
-                            lang = lang,
-                            selected = selected,
-                            enabled = false,
-                            supportingText = "Download from Language Packs first",
-                            onSelect = onSelect
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionHeaderTitle(text: String) {
+fun SectionHeaderTitle(text: String) {
     Text(
         text = text,
         color = Color.Gray,
@@ -478,7 +393,7 @@ private fun SectionHeaderTitle(text: String) {
 }
 
 @Composable
-private fun LanguageItem(
+fun LanguageItem(
     lang: LanguageOption,
     selected: LanguageOption,
     enabled: Boolean,

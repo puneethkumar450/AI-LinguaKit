@@ -1,11 +1,13 @@
 package com.example.translateapp.ui
 
+import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -65,7 +68,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.translateapp.R
 import com.example.translateapp.data.TranslationHistoryEntity
@@ -77,7 +82,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
+fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit) {
     val allHistory by vm.allHistory.collectAsState()
     val favorites by vm.favorites.collectAsState()
     val filter by vm.historyFilter.collectAsState()
@@ -110,7 +115,7 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(vertical = padding.calculateTopPadding())) {
+        Column(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = 16.dp)) {
             // ── Search bar ───────────────────────────────────────────────────────
             OutlinedTextField(
                 value = searchQuery,
@@ -127,6 +132,12 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
                         }
                     }
                 },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Gray.copy(0.15f),
+                    unfocusedContainerColor = Color.Gray.copy(0.15f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
@@ -202,7 +213,7 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit){
                             else stringResource(R.string.history_empty_all),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -279,11 +290,8 @@ private fun HistoryCard(
             .animateContentSize(tween(200))
             .clickable { onToggleExpand() },
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 4.dp else 1.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.isFavorite)
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.surface
+            containerColor =  MaterialTheme.colorScheme.primaryContainer
         )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -298,7 +306,7 @@ private fun HistoryCard(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .background(MaterialTheme.colorScheme.primary.copy(0.2f))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -399,7 +407,7 @@ private fun HistoryCard(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             ),
-                            border = androidx.compose.foundation.BorderStroke(
+                            border = BorderStroke(
                                 1.dp,
                                 MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
                             )
@@ -427,4 +435,34 @@ private fun HistoryCard(
             }
         }
     }
+}
+
+
+@Composable
+@Preview(showBackground = true)
+fun HistoryScreenPreview(){
+    HistoryScreen(AppViewModel(Application()), {}, {})
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HistoryCardPreview_Collapsed() {
+
+    fun getDummyHistory() = TranslationHistoryEntity(
+        id = 1,
+        sourceText = "Hello",
+        translatedText = "Hola",
+        sourceLangName = "English",
+        targetLangName = "Spanish",
+        isFavorite = false,
+        sourceLangCode = "en",
+        targetLangCode = "es")
+    HistoryCard(
+        entry = getDummyHistory(),
+        isExpanded = false,
+        onToggleExpand = {},
+        onFavoriteToggle = {},
+        onDelete = {},
+        onRestore = {}
+    )
 }
