@@ -84,8 +84,9 @@ private const val PREF_TRANSLATE_ACTIONS = "translate_actions"
 private const val PREF_COUNTED_TRANSLATION_KEYS = "counted_translation_keys"
 private const val PREF_FREE_LANGUAGE_CODES = "free_language_codes"
 private const val FREE_WORD_LIMIT = 5_000
-private const val FREE_LANGUAGE_LIMIT = 2
+private const val FREE_LANGUAGE_LIMIT = 3
 private const val AD_FREQUENCY = 3
+private val DEFAULT_FREE_LANGUAGE = SUPPORTED_LANGUAGES.first { it.code == "en" }
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -223,17 +224,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun completeFirstRun(source: LanguageOption, target: LanguageOption) {
-        val selected = listOf(source, target).distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT)
+        val selected = listOf(DEFAULT_FREE_LANGUAGE, source, target)
+            .distinctBy { it.code }
+            .take(FREE_LANGUAGE_LIMIT)
         persistFreeLanguages(selected)
         prefs.edit {
             putBoolean(PREF_IS_FIRST_RUN, false)
-                .putString(PREF_SOURCE_LANG_CODE, source.code)
-                .putString(PREF_TARGET_LANG_CODE, target.code)
+                .putString(PREF_SOURCE_LANG_CODE, DEFAULT_FREE_LANGUAGE.code)
+                .putString(PREF_TARGET_LANG_CODE, source.code)
         }
 
         _isFirstRun.value = false
-        _translateSourceLang.value = source
-        _translateTargetLang.value = target
+        _translateSourceLang.value = DEFAULT_FREE_LANGUAGE
+        _translateTargetLang.value = source
 
         viewModelScope.launch {
             _uiMessage.emit("Downloading your selected language packs.")
@@ -261,7 +264,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return if (isPremium.value) {
             listOf(AUTO_DETECT_OPTION) + SUPPORTED_LANGUAGES
         } else {
-            _freePlanLanguages.value
+            SUPPORTED_LANGUAGES
         }
     }
 
@@ -269,7 +272,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return if (isPremium.value) {
             SUPPORTED_LANGUAGES
         } else {
-            _freePlanLanguages.value
+            SUPPORTED_LANGUAGES
         }
     }
 
@@ -320,6 +323,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setTranslateSourceLang(lang: LanguageOption) {
         val safeLang = sanitizeSourceLanguage(lang)
+        if (safeLang.code == _translateTargetLang.value.code) return
         _translateSourceLang.value = safeLang
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
@@ -336,6 +340,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setTranslateTargetLang(lang: LanguageOption) {
         val safeLang = sanitizeTargetLanguage(lang)
+        if (safeLang.code == _translateSourceLang.value.code) return
         _translateTargetLang.value = safeLang
         _translatedText.value = ""
         _translateSource.value = TranslateSource.NONE
@@ -357,12 +362,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         val input = _translateInput.value
         val output = _translatedText.value
-        setTranslateSourceLang(tgt)
-        setTranslateTargetLang(src)
 
-        if (output.isNotBlank()) {
-            _translateInput.value = output
-            _translatedText.value = input
+        _translateSourceLang.value = sanitizeSourceLanguage(tgt)
+        _translateTargetLang.value = sanitizeTargetLanguage(src)
+        _translateSource.value = TranslateSource.NONE
+        _translateError.value = null
+        _detectedLanguage.value = null
+        _translateInput.value = output
+        _translatedText.value = input
+
+        prefs.edit {
+            putString(PREF_SOURCE_LANG_CODE, _translateSourceLang.value.code)
+            putString(PREF_TARGET_LANG_CODE, _translateTargetLang.value.code)
+        }
+
+        viewModelScope.launch {
+            val swappedSource = _translateSourceLang.value
+            val swappedTarget = _translateTargetLang.value
+            if (canWarmUp(swappedSource.mlKitCode, swappedTarget.mlKitCode)) {
+                downloader.warmUp(swappedSource.mlKitCode, swappedTarget.mlKitCode)
+            }
         }
     }
 
@@ -831,7 +850,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val chosen = when {
             downloaded.size >= FREE_LANGUAGE_LIMIT -> downloaded.take(FREE_LANGUAGE_LIMIT)
             persisted.isNotEmpty() -> persisted.take(FREE_LANGUAGE_LIMIT)
-            else -> SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT)
+            else -> listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(FREE_LANGUAGE_LIMIT - 1)
         }
 
         persistFreeLanguages(chosen)
@@ -855,7 +874,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit { putStringSet(PREF_FREE_LANGUAGE_CODES, codes)}
         _freePlanLanguages.value = codes.mapNotNull { code ->
             SUPPORTED_LANGUAGES.find { it.code == code }
-        }.ifEmpty { SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT) }
+        }.ifEmpty {
+            listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(FREE_LANGUAGE_LIMIT - 1)
+        }
     }
 
     private fun loadPersistedFreeLanguages(): List<LanguageOption> {
@@ -869,18 +890,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val source = prefs.getString(PREF_SOURCE_LANG_CODE, SUPPORTED_LANGUAGES.first().code)
         val target = prefs.getString(PREF_TARGET_LANG_CODE, SUPPORTED_LANGUAGES.getOrNull(1)?.code ?: SUPPORTED_LANGUAGES.first().code)
         return listOfNotNull(
-            SUPPORTED_LANGUAGES.find { it.code == source },
+            DEFAULT_FREE_LANGUAGE,
             SUPPORTED_LANGUAGES.find { it.code == target }
-        ).distinctBy { it.code }.ifEmpty { SUPPORTED_LANGUAGES.take(FREE_LANGUAGE_LIMIT) }
+        ).distinctBy { it.code }
+            .plus(SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code && it.code != target })
+            .take(FREE_LANGUAGE_LIMIT)
+            .ifEmpty {
+                listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(FREE_LANGUAGE_LIMIT - 1)
+            }
     }
 
     private fun loadInitialSourceLanguage(): LanguageOption {
         val persisted = prefs.getString(PREF_SOURCE_LANG_CODE, null)
         val preferred = SUPPORTED_LANGUAGES.find { it.code == persisted }
         return if (!isPremium.value && preferred != null && !loadInitialFreeLanguages().any { it.code == preferred.code }) {
-            loadInitialFreeLanguages().first()
+            DEFAULT_FREE_LANGUAGE
         } else {
-            preferred ?: loadInitialFreeLanguages().first()
+            preferred ?: DEFAULT_FREE_LANGUAGE
         }
     }
 
@@ -888,9 +914,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val persisted = prefs.getString(PREF_TARGET_LANG_CODE, null)
         val preferred = SUPPORTED_LANGUAGES.find { it.code == persisted }
         return if (!isPremium.value && preferred != null && !loadInitialFreeLanguages().any { it.code == preferred.code }) {
-            loadInitialFreeLanguages().getOrElse(1) { loadInitialFreeLanguages().first() }
+            loadInitialFreeLanguages().getOrElse(1) { DEFAULT_FREE_LANGUAGE }
         } else {
-            preferred ?: loadInitialFreeLanguages().getOrElse(1) { loadInitialFreeLanguages().first() }
+            preferred ?: loadInitialFreeLanguages().getOrElse(1) { DEFAULT_FREE_LANGUAGE }
         }
     }
 
@@ -898,7 +924,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return if (isPremium.value) {
             lang
         } else {
-            _freePlanLanguages.value.find { it.code == lang.code } ?: _freePlanLanguages.value.first()
+            _freePlanLanguages.value.find { it.code == lang.code } ?: DEFAULT_FREE_LANGUAGE
         }
     }
 
@@ -906,7 +932,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return if (isPremium.value) {
             lang
         } else {
-            _freePlanLanguages.value.find { it.code == lang.code } ?: _freePlanLanguages.value.getOrElse(1) { _freePlanLanguages.value.first() }
+            _freePlanLanguages.value.find { it.code == lang.code }
+                ?: _freePlanLanguages.value.firstOrNull { it.code != _translateSourceLang.value.code }
+                ?: DEFAULT_FREE_LANGUAGE
         }
     }
 }

@@ -36,6 +36,7 @@ fun LanguagePickerScreen(
     selected: LanguageOption,
     options: List<LanguageOption>,
     downloadedCodes: Set<String> = emptySet(),
+    blockedCode: String? = null,
     onSelect: (LanguageOption) -> Unit,
     onBack: () -> Unit
 ) {
@@ -90,7 +91,7 @@ fun LanguagePickerScreen(
                         LanguageItem(
                             lang = lang,
                             selected = selected,
-                            enabled = true,
+                            enabled = lang.code != blockedCode,
                             supportingText = "Ready to use",
                             onSelect = onSelect
                         )

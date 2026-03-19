@@ -61,12 +61,8 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                         vm = vm,
                         onNavigateToHistory = { navController.navigate("history") },
                         onNavigateToSettings = { navController.navigate("settings") },
-                        onNavigateToSourcePicker = {
-                            if (isPremium) navController.navigate("source_picker")
-                        },
-                        onNavigateToTargetPicker = {
-                            if (isPremium) navController.navigate("target_picker")
-                        }
+                        onNavigateToSourcePicker = { navController.navigate("source_picker") },
+                        onNavigateToTargetPicker = { navController.navigate("target_picker") }
                     )
                 }
                 composable("history") {
@@ -115,6 +111,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                         selected = vm.translateSourceLang.collectAsState().value,
                         options = vm.getSelectableSourceLanguages(),
                         downloadedCodes = downloadedCodes,
+                        blockedCode = vm.translateTargetLang.collectAsState().value.code,
                         onSelect = {
                             vm.setTranslateSourceLang(it)
                             navController.popBackStack()
@@ -128,6 +125,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                         selected = vm.translateTargetLang.collectAsState().value,
                         options = vm.getSelectableTargetLanguages(),
                         downloadedCodes = downloadedCodes,
+                        blockedCode = vm.translateSourceLang.collectAsState().value.code,
                         onSelect = {
                             vm.setTranslateTargetLang(it)
                             navController.popBackStack()

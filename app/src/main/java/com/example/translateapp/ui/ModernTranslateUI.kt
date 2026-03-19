@@ -1,12 +1,10 @@
 package com.example.translateapp.ui
 
-import android.app.Activity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,28 +13,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,33 +41,27 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.translateapp.R
-import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.LanguageOption
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -96,6 +85,7 @@ fun ModernTranslateScreen(
     val loading by vm.translateLoading.collectAsState()
     val error by vm.translateError.collectAsState()
     val isRecording by vm.isRecording.collectAsState()
+    val isSpeaking by vm.isSpeaking.collectAsState()
     val historyItems by vm.allHistory.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
 
@@ -113,6 +103,7 @@ fun ModernTranslateScreen(
         },
         targetLanguage = targetLang.displayName,
         isRecording = isRecording,
+        isSpeaking = isSpeaking,
         historyCount = historyItems.size,
         isPremium = isPremium,
         onInputChange = vm::onTranslateInputChange,
@@ -129,16 +120,14 @@ fun ModernTranslateScreen(
         },
         onSecondaryTranslate = { vm.translateFromPrimaryAction() },
         onLanguageSwap = { vm.swapTranslateLanguages() },
-        onSourceLangClick = {
-            if (isPremium) onNavigateToSourcePicker()
-        },
-        onTargetLangClick = {
-            if (isPremium) onNavigateToTargetPicker()
-        },
+        onSourceLangClick = onNavigateToSourcePicker,
+        onTargetLangClick = onNavigateToTargetPicker,
         onHistoryClick = onNavigateToHistory,
         onSettingsClick = onNavigateToSettings,
         onSpeak = { vm.speakText(translatedText, targetLang.code) },
-        canChangeLanguages = isPremium,
+        onStopSpeaking = vm::stopSpeaking,
+        onClearInput = vm::clearTranslation,
+        canChangeLanguages = true,
         showBannerAd = !isPremium
     )
 }
@@ -153,6 +142,7 @@ private fun MainTranslateView(
     sourceLanguage: String,
     targetLanguage: String,
     isRecording: Boolean,
+    isSpeaking: Boolean,
     historyCount: Int,
     isPremium: Boolean,
     onInputChange: (String) -> Unit,
@@ -164,9 +154,23 @@ private fun MainTranslateView(
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onSpeak: () -> Unit,
+    onStopSpeaking: () -> Unit,
+    onClearInput: () -> Unit,
     canChangeLanguages: Boolean,
     showBannerAd: Boolean
 ) {
+    val estimatedVisualLines = remember(input) {
+        input.lineSequence().sumOf { line ->
+            val wrappedSegments = (line.length / 32).coerceAtLeast(0)
+            wrappedSegments + 1
+        }.coerceAtLeast(1)
+    }
+    val inputFontSize = when(estimatedVisualLines) {
+        in 1..3 -> 24.sp
+        in 4..6 -> 18.sp
+        else -> 16.sp
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -200,17 +204,27 @@ private fun MainTranslateView(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 24.dp)
+                    .padding(horizontal = 24.dp)
             ) {
+                if (input.isNotBlank()) {
+                    IconButton(
+                        modifier = Modifier.align(Alignment.End),
+                        onClick = onClearInput
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear")
+                    }
+                }
                 TextField(
                     value = input,
                     onValueChange = onInputChange,
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Normal),
+                    textStyle = TextStyle(fontSize = inputFontSize, fontWeight = FontWeight.Normal),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onSecondaryTranslate() }),
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.enter_text_placeholder),
-                            style = TextStyle(color = Color.Black.copy(alpha = 0.3f), fontSize = 28.sp)
+                            style = TextStyle(color = Color.Black.copy(alpha = 0.3f), fontSize = inputFontSize)
                         )
                     },
                     colors = TextFieldDefaults.colors(
@@ -238,27 +252,6 @@ private fun MainTranslateView(
                 }
 
                 if (translatedText.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Surface(
-                            onClick = onLanguageSwap,
-                            shape = RoundedCornerShape(999.dp),
-                            tonalElevation = 2.dp,
-                            shadowElevation = 1.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(Icons.Default.SwapVert, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(stringResource(R.string.swap_translation_pair), style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
                     Spacer(modifier = Modifier.height(24.dp))
@@ -266,17 +259,29 @@ private fun MainTranslateView(
                         text = translatedText,
                         style = TextStyle(
                             color = Color(0xFF1F6FEB),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = inputFontSize,
+                            fontWeight = FontWeight.Normal
                         ),
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(onClick = onSpeak) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Speak result")
+
+                    if(!isSpeaking){
+                        TextButton(onClick = onSpeak) {
+                            Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Speak result")
+                        }
                     }
+                    if (isSpeaking) {
+                        TextButton(onClick = onStopSpeaking) {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Stop")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Offline Translation", color = Color.Gray, fontSize = 14.sp)
                 }
             }
 

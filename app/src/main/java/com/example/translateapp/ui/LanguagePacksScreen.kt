@@ -88,7 +88,7 @@ fun LanguagePacksScreen(
     val allPacks by vm.allPacks.collectAsState()
     val downloading by vm.downloadingPacks.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
-    var wifiOnly by remember { mutableStateOf(true) }
+    var wifiOnly by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
     var showUpgradeDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
 
