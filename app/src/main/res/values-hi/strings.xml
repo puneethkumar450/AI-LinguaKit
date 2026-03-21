@@ -4,7 +4,7 @@
     <string name="confirm">पुष्टि करें</string>
     <string name="continue_label">जारी रखें</string>
     <string name="continue_in_seconds">%1$d सेकंड में जारी रखें</string>
-    <string name="enter_text_placeholder">पाठ दर्ज करें</string>
+    <string name="enter_text_placeholder">पाठ का अनुवाद करें</string>
     <string name="settings_title">सेटिंग्स</string>
     <string name="choose_two_languages">2 भाषाएँ चुनें</string>
     <string name="selected_count_template">%1$d/2</string>

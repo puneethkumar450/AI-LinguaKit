@@ -4,7 +4,7 @@
     <string name="confirm">Confirmer</string>
     <string name="continue_label">Continuer</string>
     <string name="continue_in_seconds">Continuer dans %1$ds</string>
-    <string name="enter_text_placeholder">Saisir du texte</string>
+    <string name="enter_text_placeholder">Traduire le texte</string>
     <string name="settings_title">Paramètres</string>
     <string name="choose_two_languages">Choisissez 2 langues</string>
     <string name="selected_count_template">%1$d/2</string>
@@ -27,7 +27,7 @@
     <string name="premium_active">Premium actif</string>
     <string name="upgrade_now">Mettre à niveau</string>
     <string name="connecting_play_billing">Connexion à Play Billing...</string>
-    <string name="billing_note">Play Billing est intégré avec une vérification locale des achats au démarrage. La vérification côté serveur reste à faire.</string>
+    <string name="billing_note">Play Billing est intégré with une vérification locale des achats au démarrage. La vérification côté serveur reste à faire.</string>
     <string name="refresh_purchase_status">Actualiser l’état de l’achat</string>
     <string name="theme_mode_title">Thème</string>
     <string name="theme_mode_system">Suivre le système</string>

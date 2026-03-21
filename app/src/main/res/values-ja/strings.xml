@@ -4,7 +4,7 @@
     <string name="confirm">確認</string>
     <string name="continue_label">続行</string>
     <string name="continue_in_seconds">%1$d秒後に続行</string>
-    <string name="enter_text_placeholder">テキストを入力</string>
+    <string name="enter_text_placeholder">テキストを翻訳</string>
     <string name="settings_title">設定</string>
     <string name="choose_two_languages">2つの言語を選択</string>
     <string name="selected_count_template">%1$d/2</string>

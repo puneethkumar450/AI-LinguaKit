@@ -4,7 +4,7 @@
     <string name="confirm">Confirmar</string>
     <string name="continue_label">Continuar</string>
     <string name="continue_in_seconds">Continuar en %1$ds</string>
-    <string name="enter_text_placeholder">Escribe texto</string>
+    <string name="enter_text_placeholder">Traducir texto</string>
     <string name="settings_title">Configuración</string>
     <string name="choose_two_languages">Elige 2 idiomas</string>
     <string name="selected_count_template">%1$d/2</string>

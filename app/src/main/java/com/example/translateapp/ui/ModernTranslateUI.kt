@@ -1,15 +1,21 @@
 package com.example.translateapp.ui
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,17 +27,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +48,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -91,6 +100,12 @@ fun ModernTranslateScreen(
 
     val recordAudioPermissionState = rememberPermissionState(android.Manifest.permission.RECORD_AUDIO)
 
+    DisposableEffect(Unit) {
+        onDispose {
+            vm.stopSpeaking()
+        }
+    }
+
     MainTranslateView(
         input = input,
         loading = loading,
@@ -120,10 +135,22 @@ fun ModernTranslateScreen(
         },
         onSecondaryTranslate = { vm.translateFromPrimaryAction() },
         onLanguageSwap = { vm.swapTranslateLanguages() },
-        onSourceLangClick = onNavigateToSourcePicker,
-        onTargetLangClick = onNavigateToTargetPicker,
-        onHistoryClick = onNavigateToHistory,
-        onSettingsClick = onNavigateToSettings,
+        onSourceLangClick = {
+            vm.stopSpeaking()
+            onNavigateToSourcePicker()
+        },
+        onTargetLangClick = {
+            vm.stopSpeaking()
+            onNavigateToTargetPicker()
+        },
+        onHistoryClick = {
+            vm.stopSpeaking()
+            onNavigateToHistory()
+        },
+        onSettingsClick = {
+            vm.stopSpeaking()
+            onNavigateToSettings()
+        },
         onSpeak = { vm.speakText(translatedText, targetLang.code) },
         onStopSpeaking = vm::stopSpeaking,
         onClearInput = vm::clearTranslation,
@@ -132,7 +159,7 @@ fun ModernTranslateScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun MainTranslateView(
     input: String,
@@ -171,10 +198,16 @@ private fun MainTranslateView(
         else -> 16.sp
     }
 
+    val minimumLines = when(input.isEmpty()) {
+        true -> 30
+        else -> estimatedVisualLines
+    }
+    val isKeyboardVisible = WindowInsets.isImeVisible
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("LinguaKit", color = Color.Black, fontWeight = FontWeight.Bold) },
+                title = { if(input.isEmpty()) Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onHistoryClick) {
                         BadgedBox(badge = {
@@ -182,16 +215,39 @@ private fun MainTranslateView(
                                 Badge { Text(historyCount.coerceAtMost(99).toString()) }
                             }
                         }) {
-                            Icon(Icons.Default.History, contentDescription = "History", tint = Color.Black)
+                            Icon(Icons.Rounded.History, contentDescription = "History")
                         }
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title), tint = Color.Black)
+                    Row {
+                        if (input.isNotBlank()) {
+                            IconButton(
+                                onClick = onClearInput
+                            ) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear")
+                            }
+                        }
+
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings_title))
+                        }
                     }
                 }
             )
+        },
+        bottomBar = {
+            Log.d("ModernTranslate", "Keyboard visible: $isKeyboardVisible")
+            if (isKeyboardVisible) {
+                KeyboardLanguageBar(
+                    sourceLanguage = sourceLanguage,
+                    targetLanguage = targetLanguage,
+                    canChangeLanguages = canChangeLanguages,
+                    onSourceLangClick = onSourceLangClick,
+                    onTargetLangClick = onTargetLangClick,
+                    onLanguageSwap = onLanguageSwap
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -204,16 +260,8 @@ private fun MainTranslateView(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 4.dp)
             ) {
-                if (input.isNotBlank()) {
-                    IconButton(
-                        modifier = Modifier.align(Alignment.End),
-                        onClick = onClearInput
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear")
-                    }
-                }
                 TextField(
                     value = input,
                     onValueChange = onInputChange,
@@ -224,7 +272,7 @@ private fun MainTranslateView(
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.enter_text_placeholder),
-                            style = TextStyle(color = Color.Black.copy(alpha = 0.3f), fontSize = inputFontSize)
+                            style = TextStyle(color = Color.Gray, fontSize = 26.sp)
                         )
                     },
                     colors = TextFieldDefaults.colors(
@@ -232,8 +280,9 @@ private fun MainTranslateView(
                         unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = Color.Black
-                    )
+                        cursorColor = colorScheme.primary
+                    ),
+                    minLines = minimumLines
                 )
 
                 if (loading) {
@@ -267,107 +316,121 @@ private fun MainTranslateView(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if(!isSpeaking){
-                        TextButton(onClick = onSpeak) {
+                        TextButton(onClick = onSpeak,
+                            colors = ButtonDefaults.buttonColors(
+                            contentColor = colorScheme.primary,
+                            containerColor = colorScheme.primary.copy(0.1f))) {
                             Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Speak result")
+                            Text("Speak")
                         }
                     }
+
                     if (isSpeaking) {
-                        TextButton(onClick = onStopSpeaking) {
+                        TextButton(onClick = onStopSpeaking,
+                            colors = ButtonDefaults.buttonColors(
+                                contentColor = colorScheme.primary,
+                                containerColor = colorScheme.primary.copy(0.1f))){
                             Icon(Icons.Default.Stop, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Stop")
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("Offline Translation", color = Color.Gray, fontSize = 14.sp)
+                    //Spacer(modifier = Modifier.height(12.dp))
+                    //Text("Offline Translation", color = Color.Gray, fontSize = 14.sp)
                 }
             }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                color = Color(0xFFF7F8FC)
-            ) {
-                Column(
-                    modifier = Modifier.padding(top = 18.dp, bottom = 28.dp, start = 24.dp, end = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            if (!isKeyboardVisible) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    color = Color.Gray.copy(0.2f)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                    Column(
+                        modifier = Modifier.padding(top = 18.dp, bottom = 28.dp, start = 24.dp, end = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        LanguageButton(
-                            text = sourceLanguage,
-                            onClick = onSourceLangClick,
-                            modifier = Modifier.weight(1f),
-                            enabled = canChangeLanguages
-                        )
-                        IconButton(onClick = onLanguageSwap, modifier = Modifier.padding(horizontal = 8.dp)) {
-                            Icon(
-                                Icons.Default.SwapHoriz,
-                                contentDescription = "Swap",
-                                tint = Color.Black.copy(alpha = 0.7f),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        LanguageButton(
-                            text = targetLanguage,
-                            onClick = onTargetLangClick,
-                            modifier = Modifier.weight(1f),
-                            enabled = canChangeLanguages
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    if (isPremium) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
+                            LanguageButton(
+                                text = sourceLanguage,
+                                onClick = onSourceLangClick,
+                                modifier = Modifier.weight(1f),
+                                enabled = canChangeLanguages
+                            )
+                            IconButton(onClick = onLanguageSwap, modifier = Modifier.padding(horizontal = 8.dp)) {
+                                Icon(
+                                    Icons.Default.SwapHoriz,
+                                    contentDescription = "Swap",
+                                    tint = Color.Gray.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            LanguageButton(
+                                text = targetLanguage,
+                                onClick = onTargetLangClick,
+                                modifier = Modifier.weight(1f),
+                                enabled = canChangeLanguages
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        if (isPremium) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = onSecondaryTranslate,
+                                    modifier = Modifier.weight(1f).height(54.dp),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Translate, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Translate")
+                                }
+                                Button(
+                                    onClick = onPrimaryAction,
+                                    modifier = Modifier.weight(1f).height(54.dp),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isRecording) Icons.Default.Lock else Icons.Default.Mic,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(if (isRecording) "Listening" else "Speak")
+                                }
+                            }
+                        } else {
                             Button(
-                                onClick = onSecondaryTranslate,
-                                modifier = Modifier.weight(1f).height(54.dp),
-                                shape = RoundedCornerShape(16.dp)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colorScheme.primary,
+                                    contentColor = Color.White
+                                ),
+                                onClick = onPrimaryAction,
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(18.dp)
                             ) {
                                 Icon(Icons.Default.Translate, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Translate")
                             }
-                            Button(
-                                onClick = onPrimaryAction,
-                                modifier = Modifier.weight(1f).height(54.dp),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isRecording) Icons.Default.Lock else Icons.Default.Mic,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isRecording) "Listening" else "Speak")
-                            }
                         }
-                    } else {
-                        Button(
-                            onClick = onPrimaryAction,
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(18.dp)
-                        ) {
-                            Icon(Icons.Default.Translate, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Translate")
-                        }
-                    }
 
-                    if (showBannerAd) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        AdBannerCard()
+                        if (showBannerAd) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            AdBannerCard()
+                        }
                     }
                 }
             }
+
         }
     }
 }
@@ -405,18 +468,23 @@ fun LanguageItem(
     supportingText: String,
     onSelect: (LanguageOption) -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     ListItem(
         headlineContent = {
             Text(
                 text = lang.displayName,
-                fontWeight = if (lang.code == selected.code) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (enabled) Color.Black else Color.Gray
+                fontWeight = if (lang.code == selected.code || enabled) FontWeight.SemiBold else FontWeight.Normal,
+                color = if((lang.code == selected.code) && enabled){
+                    colors.primary
+                }else{
+                    if (enabled) colors.onSecondary else colors.onSecondary.copy(alpha = 0.8f)
+                }
             )
         },
         supportingContent = {
             Text(
                 supportingText,
-                color = if (enabled) Color.Gray else Color.Gray.copy(alpha = 0.8f)
+                color = if (enabled) colors.onSecondary else colors.onSecondary.copy(alpha = 0.8f)
             )
         },
         trailingContent = {
@@ -425,7 +493,9 @@ fun LanguageItem(
                 !enabled -> Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color.Gray)
             }
         },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        colors = ListItemDefaults.colors(containerColor =
+            if(lang.code == selected.code) colors.primary.copy(alpha = 0.05f)
+            else Color.Transparent),
         modifier = if (enabled) Modifier.clickable { onSelect(lang) } else Modifier
     )
     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Black.copy(alpha = 0.05f))
@@ -438,20 +508,109 @@ private fun LanguageButton(
     modifier: Modifier = Modifier,
     enabled: Boolean
 ) {
+    val colors = colorScheme
     Surface(
+        color = colors.surface,
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(64.dp),
         shape = RoundedCornerShape(16.dp),
-        border = if (!enabled) BorderStroke(1.dp, Color(0xFFD8DCE8)) else null
+        border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
-                color = Color.Black.copy(alpha = if (enabled) 1f else 0.7f),
+                color = colors.onPrimaryContainer.copy(alpha = if (enabled) 1f else 0.7f),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 10.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun KeyboardLanguageBar(
+    sourceLanguage: String,
+    targetLanguage: String,
+    canChangeLanguages: Boolean,
+    onSourceLangClick: () -> Unit,
+    onTargetLangClick: () -> Unit,
+    onLanguageSwap: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = colorScheme.surface.copy(alpha = 0.96f),
+        shadowElevation = 8.dp,
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            KeyboardLanguageButton(
+                text = sourceLanguage,
+                onClick = onSourceLangClick,
+                modifier = Modifier.weight(1f),
+                enabled = canChangeLanguages
+            )
+            Surface(
+                onClick = onLanguageSwap,
+                shape = RoundedCornerShape(16.dp),
+                color = colorScheme.primary.copy(alpha = 0.08f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.SwapHoriz,
+                        contentDescription = "Swap",
+                        tint = colorScheme.primary
+                    )
+                }
+            }
+            KeyboardLanguageButton(
+                text = targetLanguage,
+                onClick = onTargetLangClick,
+                modifier = Modifier.weight(1f),
+                enabled = canChangeLanguages
+            )
+        }
+    }
+}
+
+@Composable
+private fun KeyboardLanguageButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean
+) {
+    val colors = colorScheme
+    Surface(
+        color = colors.surfaceVariant.copy(alpha = 0.85f),
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(52.dp),
+        shape = RoundedCornerShape(18.dp),
+        border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                color = colors.onSurface.copy(alpha = if (enabled) 1f else 0.7f),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
                 modifier = Modifier.padding(horizontal = 10.dp)
             )
         }
