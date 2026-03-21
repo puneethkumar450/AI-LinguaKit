@@ -366,7 +366,7 @@ private fun MainTranslateView(
                                 Icon(
                                     Icons.Default.SwapHoriz,
                                     contentDescription = "Swap",
-                                    tint = Color.Gray.copy(alpha = 0.7f),
+                                    tint = colorScheme.primary,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -513,7 +513,7 @@ private fun LanguageButton(
         color = colors.surface,
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(64.dp),
+        modifier = modifier.height(56.dp),
         shape = RoundedCornerShape(16.dp),
         border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
     ) {
@@ -545,10 +545,10 @@ private fun KeyboardLanguageBar(
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(0.dp),
         color = colorScheme.surface.copy(alpha = 0.96f),
-        shadowElevation = 8.dp,
-        tonalElevation = 4.dp
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier

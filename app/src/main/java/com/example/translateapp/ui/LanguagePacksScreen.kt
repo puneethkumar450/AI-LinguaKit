@@ -34,14 +34,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -69,25 +68,51 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.translateapp.R
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
+import com.example.translateapp.ui.theme.TranslateAppTheme
 import com.example.translateapp.viewmodel.AppViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguagePacksScreen(
     vm: AppViewModel,
-    onBack: () -> Unit,
-    onUpgrade: () -> Unit
+    onBack: () -> Unit
 ) {
     val allPacks by vm.allPacks.collectAsState()
     val downloading by vm.downloadingPacks.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
+
+    LanguagePacksContent(
+        allPacks = allPacks,
+        downloading = downloading,
+        isPremium = isPremium,
+        onBack = onBack,
+        onRefresh = { vm.refreshPackStatus() },
+        onDownload = { code, wifi -> vm.downloadPack(code, wifi) },
+        onDelete = { code -> vm.deletePack(code) },
+        canDownload = { code -> vm.canDownloadPack(code) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguagePacksContent(
+    allPacks: List<LanguagePackEntity>,
+    downloading: Set<String>,
+    isPremium: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onDownload: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
+    canDownload: (String) -> Boolean
+) {
     var wifiOnly by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
     var showUpgradeDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
@@ -115,7 +140,7 @@ fun LanguagePacksScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.background.copy(0.1f))
@@ -138,12 +163,7 @@ fun LanguagePacksScreen(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!isPremium) {
-                                TextButton(onClick = onUpgrade) {
-                                    Text("Upgrade")
-                                }
-                            }
-                            IconButton(onClick = { vm.refreshPackStatus() }) {
+                            IconButton(onClick = onRefresh) {
                                 Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                             }
                         }
@@ -189,25 +209,19 @@ fun LanguagePacksScreen(
             }
 
             if (!isPremium) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Default.Info, contentDescription = null)
-                        Text("Delete a downloaded language to free a slot, then download a new one.")
-                    }
+                    //Icon(Icons.Default.Info, contentDescription = null)
+                    Text("Delete a downloaded language to free a slot, then download a new one.",
+                        fontSize = 12.sp)
                 }
             }
 
             LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val downloadedPacks = allPacks.filter { it.status == PackStatus.DOWNLOADED }
@@ -236,8 +250,8 @@ fun LanguagePacksScreen(
                             pack = pack,
                             isDownloading = downloading.contains(pack.mlKitCode),
                             onDownload = {
-                                if (vm.canDownloadPack(pack.mlKitCode)) {
-                                    vm.downloadPack(pack.mlKitCode, wifiOnly)
+                                if (canDownload(pack.mlKitCode)) {
+                                    onDownload(pack.mlKitCode, wifiOnly)
                                 } else {
                                     showUpgradeDialog = pack
                                 }
@@ -258,7 +272,7 @@ fun LanguagePacksScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            vm.deletePack(pack.mlKitCode)
+                            onDelete(pack.mlKitCode)
                             showDeleteDialog = null
                         }
                     ) { Text("Remove") }
@@ -273,20 +287,16 @@ fun LanguagePacksScreen(
             AlertDialog(
                 onDismissRequest = { showUpgradeDialog = null },
                 icon = { Icon(Icons.Default.Star, contentDescription = null) },
-                title = { Text("Upgrade for more languages") },
+                title = { Text("Free plan limit reached") },
                 text = {
-                    Text("You are using the free plan. Delete one downloaded language or upgrade to download ${pack.displayName} and more packs.")
+                    Text("You are using the free plan. Delete one downloaded language to download ${pack.displayName}.")
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             showUpgradeDialog = null
-                            onUpgrade()
                         }
-                    ) { Text("Upgrade") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showUpgradeDialog = null }) { Text("Later") }
+                    ) { Text("OK") }
                 }
             )
         }
@@ -325,7 +335,6 @@ private fun PackCard(
             .fillMaxWidth()
             .animateContentSize(),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -355,7 +364,8 @@ private fun PackCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(pack.displayName, fontWeight = FontWeight.SemiBold)
+                Text(pack.displayName, fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondary)
                 val subtitle = when {
                     isDownloading -> "Downloading..."
                     pack.status == PackStatus.DOWNLOADED -> "Ready offline • downloaded ${dateFormatter.format(Date(pack.downloadedAtMs))}"
@@ -381,7 +391,9 @@ private fun PackCard(
                 when (state) {
                     "loading" -> CircularPackIndicator()
                     "delete" -> IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = "Remove")
+                        Icon(Icons.Rounded.Delete,
+                            contentDescription = "Remove",
+                            tint = MaterialTheme.colorScheme.errorContainer)
                     }
                     else -> IconButton(onClick = onDownload) {
                         Icon(Icons.Default.CloudDownload, contentDescription = "Download")
@@ -395,6 +407,8 @@ private fun PackCard(
 @Composable
 private fun CircularPackIndicator() {
     LinearProgressIndicator(
+        color = MaterialTheme.colorScheme.primary,
+        trackColor = Color.White,
         modifier = Modifier.width(40.dp).height(4.dp)
     )
 }
@@ -406,5 +420,30 @@ private fun statusBg(status: PackStatus, isDownloading: Boolean): Color {
         status == PackStatus.DOWNLOADED -> Color(0xFFDCFCE7)
         status == PackStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LanguagePacksScreenPreview() {
+    val samplePacks = listOf(
+        LanguagePackEntity("en", "English", PackStatus.DOWNLOADED, System.currentTimeMillis()),
+        LanguagePackEntity("es", "Spanish", PackStatus.DOWNLOADED, System.currentTimeMillis()),
+        LanguagePackEntity("fr", "French", PackStatus.NOT_DOWNLOADED),
+        LanguagePackEntity("de", "German", PackStatus.DOWNLOADING),
+        LanguagePackEntity("it", "Italian", PackStatus.FAILED, errorMessage = "Connection timeout")
+    )
+
+    TranslateAppTheme(darkTheme = true) {
+        LanguagePacksContent(
+            allPacks = samplePacks,
+            downloading = setOf("de"),
+            isPremium = false,
+            onBack = {},
+            onRefresh = {},
+            onDownload = { _, _ -> },
+            onDelete = { _ -> },
+            canDownload = { true }
+        )
     }
 }

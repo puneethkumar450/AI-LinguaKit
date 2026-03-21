@@ -75,8 +75,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 composable("packs") {
                     LanguagePacksScreen(
                         vm = vm,
-                        onBack = { navController.popBackStack() },
-                        onUpgrade = { navController.navigate("plan_selection") }
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable("plan_selection") {
@@ -90,7 +89,6 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                         vm = vm,
                         onBack = { navController.popBackStack() },
                         onOpenLanguageChange = { navController.navigate("language_change") },
-                        onOpenPlans = { navController.navigate("plan_selection") },
                         onOpenLanguagePacks = { navController.navigate("packs") }
                     )
                 }

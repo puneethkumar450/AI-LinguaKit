@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +42,6 @@ fun SettingsScreenUI(
     vm: AppViewModel,
     onBack: () -> Unit,
     onOpenLanguageChange: () -> Unit,
-    onOpenPlans: () -> Unit,
     onOpenLanguagePacks: () -> Unit
 ) {
     val themeMode by vm.themeMode.collectAsState()
@@ -118,7 +116,6 @@ fun SettingsScreenUI(
                     onClick = onOpenLanguagePacks
                 )
             }
-
             item {
                 Card(shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors().copy(
@@ -138,10 +135,6 @@ fun SettingsScreenUI(
                             Text(stringResource(R.string.words_left_template, remainingWords))
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(stringResource(R.string.downloaded_languages_template, downloadedCount))
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(onClick = onOpenPlans, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (isPremium) stringResource(R.string.manage_plan) else stringResource(R.string.upgrade_now))
                         }
                     }
                 }
