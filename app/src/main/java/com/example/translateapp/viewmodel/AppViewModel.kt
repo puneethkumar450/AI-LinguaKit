@@ -34,6 +34,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
@@ -193,6 +195,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _downloadingPacks = MutableStateFlow<Set<String>>(emptySet())
     val downloadingPacks: StateFlow<Set<String>> = _downloadingPacks.asStateFlow()
+    private val _packDownloadProgress = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val packDownloadProgress: StateFlow<Map<String, Int>> = _packDownloadProgress.asStateFlow()
+    private val packDownloadJobs = mutableMapOf<String, Job>()
+    private val packProgressJobs = mutableMapOf<String, Job>()
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var translateJob: Job? = null
@@ -302,11 +308,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun canDownloadPack(mlKitCode: String): Boolean {
         if (isPremium.value) return true
-        val downloadedCodes = allPacks.value
+        val reservedCodes = allPacks.value
             .filter { it.status == PackStatus.DOWNLOADED }
             .map { it.mlKitCode }
-            .toSet()
-        return downloadedCodes.contains(mlKitCode) || downloadedCodes.size < FREE_LANGUAGE_LIMIT
+            .toMutableSet()
+        reservedCodes += _downloadingPacks.value
+        return reservedCodes.contains(mlKitCode) || reservedCodes.size < FREE_LANGUAGE_LIMIT
     }
 
     fun setLiveCameraMode(enabled: Boolean) {
@@ -487,23 +494,60 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
-        viewModelScope.launch {
+        val job = viewModelScope.launch {
+            if (_downloadingPacks.value.contains(mlKitCode)) {
+                return@launch
+            }
+
+            val app = getApplication<Application>()
+            if (!ConnectivityHelper.isOnline(app)) {
+                _uiMessage.emit("No internet connection. Connect and try again.")
+                return@launch
+            }
+
+            if (requireWifi && !ConnectivityHelper.isWifiConnected(app)) {
+                _uiMessage.emit("Wi-Fi is required to download this language pack.")
+                return@launch
+            }
+
             if (!canDownloadPack(mlKitCode)) {
-                _uiMessage.emit("You are using the free plan. Delete one language or upgrade for more languages.")
+                _uiMessage.emit("Free plan limit reached. Delete one downloaded language before downloading another.")
                 return@launch
             }
 
             _downloadingPacks.value += mlKitCode
+            _packDownloadProgress.value = _packDownloadProgress.value + (mlKitCode to 1)
+            startPackProgressSimulation(mlKitCode)
             try {
-                packRepo.downloadPack(mlKitCode, requireWifi)
+                packRepo.downloadPack(mlKitCode, requireWifi) { progress ->
+                    updatePackProgress(mlKitCode, progress)
+                }
+                stopPackProgressSimulation(mlKitCode)
+                updatePackProgress(mlKitCode, 100)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
                 _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
                 reconcileFreeLanguagesWithCurrentState()
             } catch (e: Exception) {
-                _uiMessage.emit("Download failed: ${e.message}")
+                stopPackProgressSimulation(mlKitCode)
+                val message = e.message?.takeIf { it.isNotBlank() } ?: "Please check your connection and try again."
+                _uiMessage.emit("Download failed: $message")
             } finally {
                 _downloadingPacks.value = _downloadingPacks.value - mlKitCode
+                _packDownloadProgress.value = _packDownloadProgress.value - mlKitCode
+                packDownloadJobs.remove(mlKitCode)
             }
+        }
+        packDownloadJobs[mlKitCode] = job
+    }
+
+    fun cancelPackDownload(mlKitCode: String) {
+        packDownloadJobs.remove(mlKitCode)?.cancel()
+        stopPackProgressSimulation(mlKitCode)
+        _downloadingPacks.value = _downloadingPacks.value - mlKitCode
+        _packDownloadProgress.value = _packDownloadProgress.value - mlKitCode
+        viewModelScope.launch {
+            packRepo.markPackNotDownloaded(mlKitCode)
+            _uiMessage.emit("Download cancelled.")
         }
     }
 
@@ -520,6 +564,35 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             packRepo.reconcileWithMlKit()
             reconcileFreeLanguagesWithCurrentState()
+        }
+    }
+
+    private fun startPackProgressSimulation(mlKitCode: String) {
+        stopPackProgressSimulation(mlKitCode)
+        packProgressJobs[mlKitCode] = viewModelScope.launch {
+            while (isActive && _downloadingPacks.value.contains(mlKitCode)) {
+                delay(350)
+                val current = _packDownloadProgress.value[mlKitCode] ?: break
+                if (current >= 92) continue
+                val next = when {
+                    current < 20 -> current + 6
+                    current < 45 -> current + 4
+                    current < 70 -> current + 3
+                    else -> current + 1
+                }.coerceAtMost(92)
+                updatePackProgress(mlKitCode, next)
+            }
+        }
+    }
+
+    private fun stopPackProgressSimulation(mlKitCode: String) {
+        packProgressJobs.remove(mlKitCode)?.cancel()
+    }
+
+    private fun updatePackProgress(mlKitCode: String, progress: Int) {
+        val current = _packDownloadProgress.value[mlKitCode] ?: 0
+        if (progress > current) {
+            _packDownloadProgress.value = _packDownloadProgress.value + (mlKitCode to progress.coerceIn(0, 100))
         }
     }
 

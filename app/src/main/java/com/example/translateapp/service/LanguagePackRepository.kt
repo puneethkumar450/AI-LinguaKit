@@ -5,6 +5,7 @@ import com.example.translateapp.data.LanguagePackDao
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -107,12 +108,22 @@ class LanguagePackRepository(
      *
      * @param requireWifi Restrict download to Wi-Fi only.
      */
-    suspend fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
+    suspend fun downloadPack(
+        mlKitCode: String,
+        requireWifi: Boolean = true,
+        onProgress: ((Int) -> Unit)? = null
+    ) {
         dao.updateStatus(mlKitCode, PackStatus.DOWNLOADING)
+        onProgress?.invoke(3)
         try {
-            downloader.downloadModel(mlKitCode, requireWifi)
+            downloader.downloadModel(mlKitCode, requireWifi, onProgress = onProgress)
             dao.updateStatus(mlKitCode, PackStatus.DOWNLOADED)
+            onProgress?.invoke(100)
             Log.d(TAG, "Pack downloaded and saved: $mlKitCode")
+        } catch (e: CancellationException) {
+            dao.markDeleted(mlKitCode)
+            Log.d(TAG, "Pack download cancelled: $mlKitCode")
+            throw e
         } catch (e: Exception) {
             val msg = e.message ?: "Unknown error"
             dao.updateStatus(mlKitCode, PackStatus.FAILED, error = msg)
@@ -135,6 +146,10 @@ class LanguagePackRepository(
             Log.e(TAG, "Pack delete failed: $mlKitCode", e)
             throw e
         }
+    }
+
+    suspend fun markPackNotDownloaded(mlKitCode: String) {
+        dao.markDeleted(mlKitCode)
     }
 
     // ── Check ──────────────────────────────────────────────────────────────────

@@ -132,7 +132,11 @@ class ModelDownloadManager {
                 }
         }
 
-    suspend fun downloadModel(mlKitCode: String, requireWifi: Boolean = true) {
+    suspend fun downloadModel(
+        mlKitCode: String,
+        requireWifi: Boolean = true,
+        onProgress: ((Int) -> Unit)? = null
+    ) {
         suspendCancellableCoroutine<Unit> { cont ->
             val model = TranslateRemoteModel.Builder(mlKitCode).build()
             val conditions = if (requireWifi) {
@@ -141,7 +145,10 @@ class ModelDownloadManager {
                 DownloadConditions.Builder().build()
             }
             remoteModelManager.download(model, conditions)
-                .addOnSuccessListener { cont.resume(Unit) }
+                .addOnSuccessListener {
+                    onProgress?.invoke(100)
+                    cont.resume(Unit)
+                }
                 .addOnFailureListener { e -> cont.resumeWithException(e) }
         }
     }

@@ -33,15 +33,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,15 +87,18 @@ fun LanguagePacksScreen(
 ) {
     val allPacks by vm.allPacks.collectAsState()
     val downloading by vm.downloadingPacks.collectAsState()
+    val downloadProgress by vm.packDownloadProgress.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
 
     LanguagePacksContent(
         allPacks = allPacks,
         downloading = downloading,
+        downloadProgress = downloadProgress,
         isPremium = isPremium,
         onBack = onBack,
         onRefresh = { vm.refreshPackStatus() },
         onDownload = { code, wifi -> vm.downloadPack(code, wifi) },
+        onCancelDownload = { code -> vm.cancelPackDownload(code) },
         onDelete = { code -> vm.deletePack(code) },
         canDownload = { code -> vm.canDownloadPack(code) }
     )
@@ -106,10 +109,12 @@ fun LanguagePacksScreen(
 private fun LanguagePacksContent(
     allPacks: List<LanguagePackEntity>,
     downloading: Set<String>,
+    downloadProgress: Map<String, Int>,
     isPremium: Boolean,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onDownload: (String, Boolean) -> Unit,
+    onCancelDownload: (String) -> Unit,
     onDelete: (String) -> Unit,
     canDownload: (String) -> Boolean
 ) {
@@ -199,7 +204,7 @@ private fun LanguagePacksContent(
 
                         if (!isPremium) {
                             Text(
-                                "Free plan: 2 languages max",
+                                "Free plan: 3 languages max",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.secondary
                             )
@@ -235,7 +240,9 @@ private fun LanguagePacksContent(
                         PackCard(
                             pack = pack,
                             isDownloading = downloading.contains(pack.mlKitCode),
+                            progressPercent = downloadProgress[pack.mlKitCode] ?: 0,
                             onDownload = {},
+                            onCancelDownload = { onCancelDownload(pack.mlKitCode) },
                             onDelete = { showDeleteDialog = pack }
                         )
                     }
@@ -249,6 +256,7 @@ private fun LanguagePacksContent(
                         PackCard(
                             pack = pack,
                             isDownloading = downloading.contains(pack.mlKitCode),
+                            progressPercent = downloadProgress[pack.mlKitCode] ?: 0,
                             onDownload = {
                                 if (canDownload(pack.mlKitCode)) {
                                     onDownload(pack.mlKitCode, wifiOnly)
@@ -256,6 +264,7 @@ private fun LanguagePacksContent(
                                     showUpgradeDialog = pack
                                 }
                             },
+                            onCancelDownload = { onCancelDownload(pack.mlKitCode) },
                             onDelete = {}
                         )
                     }
@@ -266,11 +275,15 @@ private fun LanguagePacksContent(
         showDeleteDialog?.let { pack ->
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = null },
-                icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
+                //icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
                 title = { Text("Remove ${pack.displayName}?") },
                 text = { Text("This frees one free-plan slot so you can download another language.") },
                 confirmButton = {
                     TextButton(
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor =  MaterialTheme.colorScheme.errorContainer.copy(0.2f) ,
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
                         onClick = {
                             onDelete(pack.mlKitCode)
                             showDeleteDialog = null
@@ -286,7 +299,7 @@ private fun LanguagePacksContent(
         showUpgradeDialog?.let { pack ->
             AlertDialog(
                 onDismissRequest = { showUpgradeDialog = null },
-                icon = { Icon(Icons.Default.Star, contentDescription = null) },
+                //icon = { Icon(Icons.Default.Star, contentDescription = null) },
                 title = { Text("Free plan limit reached") },
                 text = {
                     Text("You are using the free plan. Delete one downloaded language to download ${pack.displayName}.")
@@ -318,7 +331,9 @@ private fun SectionHeader(label: String, icon: ImageVector, tint: Color) {
 private fun PackCard(
     pack: LanguagePackEntity,
     isDownloading: Boolean,
+    progressPercent: Int,
     onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
@@ -367,7 +382,7 @@ private fun PackCard(
                 Text(pack.displayName, fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondary)
                 val subtitle = when {
-                    isDownloading -> "Downloading..."
+                    isDownloading -> "Downloading... $progressPercent%"
                     pack.status == PackStatus.DOWNLOADED -> "Ready offline • downloaded ${dateFormatter.format(Date(pack.downloadedAtMs))}"
                     pack.status == PackStatus.FAILED -> "Failed: ${pack.errorMessage ?: "unknown error"}"
                     else -> "~${pack.approximateSizeKb / 1024} MB"
@@ -377,6 +392,16 @@ private fun PackCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = if (pack.status == PackStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
+                if (isDownloading) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = { (progressPercent.coerceIn(0, 100) / 100f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                            .clip(CircleShape)
+                    )
+                }
             }
 
             AnimatedContent(
@@ -389,11 +414,14 @@ private fun PackCard(
                 label = "pack_action"
             ) { state ->
                 when (state) {
-                    "loading" -> CircularPackIndicator()
+                    "loading" -> IconButton(onClick = onCancelDownload) {
+                        Icon(Icons.Default.Stop,
+                            contentDescription = "Cancel download", tint = MaterialTheme.colorScheme.error)
+                    }
                     "delete" -> IconButton(onClick = onDelete) {
                         Icon(Icons.Rounded.Delete,
                             contentDescription = "Remove",
-                            tint = MaterialTheme.colorScheme.errorContainer)
+                            tint = MaterialTheme.colorScheme.error)
                     }
                     else -> IconButton(onClick = onDownload) {
                         Icon(Icons.Default.CloudDownload, contentDescription = "Download")
@@ -438,10 +466,12 @@ fun LanguagePacksScreenPreview() {
         LanguagePacksContent(
             allPacks = samplePacks,
             downloading = setOf("de"),
+            downloadProgress = mapOf("de" to 62),
             isPremium = false,
             onBack = {},
             onRefresh = {},
             onDownload = { _, _ -> },
+            onCancelDownload = { _ -> },
             onDelete = { _ -> },
             canDownload = { true }
         )
