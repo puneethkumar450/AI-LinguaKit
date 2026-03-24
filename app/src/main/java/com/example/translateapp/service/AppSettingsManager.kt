@@ -1,8 +1,10 @@
 package com.example.translateapp.service
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import com.example.translateapp.R
 
 enum class AppThemeMode(val storageValue: String, val nightMode: Int) {
     SYSTEM("system", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM),
@@ -18,8 +20,10 @@ enum class AppThemeMode(val storageValue: String, val nightMode: Int) {
 
 data class AppLanguageOption(
     val languageTag: String,
-    val displayName: String
-)
+    @StringRes val displayNameResId: Int
+) {
+    fun displayName(context: Context): String = context.getString(displayNameResId)
+}
 
 private const val PREF_THEME_MODE = "theme_mode"
 private const val PREF_APP_LANGUAGE = "app_language"
@@ -55,19 +59,19 @@ object AppSettingsManager {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageTag))
     }
 
-    fun supportedLanguages(): List<AppLanguageOption> {
+    fun supportedLanguages(context: Context): List<AppLanguageOption> {
         return listOf(
-            AppLanguageOption("", "System default"),
-            AppLanguageOption("en", "English"),
-            AppLanguageOption("zh-CN", "Chinese (Simplified)"),
-            AppLanguageOption("ja", "Japanese"),
-            AppLanguageOption("ko", "Korean"),
-            AppLanguageOption("ar", "Arabic"),
-            AppLanguageOption("es", "Spanish"),
-            AppLanguageOption("fr", "French"),
-            AppLanguageOption("de", "German"),
-            AppLanguageOption("pt-BR", "Portuguese (Brazil)"),
-            AppLanguageOption("hi", "Hindi")
+            AppLanguageOption("", R.string.system_default),
+            AppLanguageOption("en", R.string.lang_english),
+            AppLanguageOption("zh-CN", R.string.lang_chinese_simplified),
+            AppLanguageOption("ja", R.string.lang_japanese),
+            AppLanguageOption("ko", R.string.lang_korean),
+            AppLanguageOption("ar", R.string.lang_arabic),
+            AppLanguageOption("es", R.string.lang_spanish),
+            AppLanguageOption("fr", R.string.lang_french),
+            AppLanguageOption("de", R.string.lang_german),
+            AppLanguageOption("pt-BR", R.string.lang_portuguese_brazil),
+            AppLanguageOption("hi", R.string.lang_hindi)
         )
     }
 }

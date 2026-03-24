@@ -397,7 +397,7 @@ private fun HistoryCard(
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text("Reuse", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.reuse), style = MaterialTheme.typography.labelMedium)
                         }
                         OutlinedButton(
                             onClick = onDelete,
@@ -418,7 +418,7 @@ private fun HistoryCard(
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text("Delete", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.delete), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -428,7 +428,7 @@ private fun HistoryCard(
             if (!isExpanded) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Tap to see translation →",
+                    stringResource(R.string.tap_to_see_translation),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                 )

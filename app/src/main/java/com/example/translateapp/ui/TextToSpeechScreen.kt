@@ -15,9 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.translateapp.R
 import com.example.translateapp.ui.theme.TranslateAppTheme
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.LanguageOption
@@ -106,6 +109,7 @@ fun SpeechToSpeechContent(
     onStopSpeaking: () -> Unit,
     onClear: () -> Unit
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -120,7 +124,7 @@ fun SpeechToSpeechContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Speech to Speech",
+                stringResource(R.string.speech_to_speech),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -159,7 +163,7 @@ fun SpeechToSpeechContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Translate to:", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.translate_to_label), style = MaterialTheme.typography.bodyLarge)
                     /*Text(
                         targetLanguage.displayName,
                         style = MaterialTheme.typography.titleMedium,
@@ -194,14 +198,14 @@ fun SpeechToSpeechContent(
             ) {
                 Icon(
                     imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                    contentDescription = if (isRecording) stringResource(R.string.stop_recording) else stringResource(R.string.start_recording),
                     modifier = Modifier.size(40.dp)
                 )
             }
         }
 
         Text(
-            text = if (isRecording) "Listening..." else "Tap to speak",
+            text = if (isRecording) stringResource(R.string.listening_ellipsis) else stringResource(R.string.tap_to_speak),
             style = MaterialTheme.typography.bodyLarge,
             color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
         )
@@ -219,7 +223,8 @@ fun SpeechToSpeechContent(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
                             Text(
-                                "Recognized" + (detectedLanguage?.let { " (${it.displayName})" } ?: ""),
+                                detectedLanguage?.let { stringResource(R.string.recognized_with_language, it.displayName(context)) }
+                                    ?: stringResource(R.string.recognized),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.secondary
                             )
@@ -239,7 +244,7 @@ fun SpeechToSpeechContent(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                                 Text(
-                                    "Translation (${targetLanguage.displayName})",
+                                    stringResource(R.string.translation_with_language, targetLanguage.displayName(context)),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -248,7 +253,7 @@ fun SpeechToSpeechContent(
                                 IconButton(onClick = onSpeakTranslated, modifier = Modifier.size(32.dp)) {
                                     Icon(
                                         Icons.Default.VolumeUp,
-                                        contentDescription = "Speak",
+                                        contentDescription = stringResource(R.string.speak),
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -273,7 +278,7 @@ fun SpeechToSpeechContent(
                 TextButton(onClick = onClear) {
                     Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Clear", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.clear), style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }
@@ -286,13 +291,13 @@ fun SpeechToSpeechContent(
             ) {
                 Icon(Icons.Default.Stop, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Stop Audio")
+                Text(stringResource(R.string.stop_audio))
             }
         }
 
         if (!ttsReady) {
             Text(
-                "Initializing speech services...",
+                stringResource(R.string.initializing_speech_services),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )

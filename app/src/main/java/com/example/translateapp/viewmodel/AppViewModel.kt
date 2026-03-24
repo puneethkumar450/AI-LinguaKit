@@ -12,9 +12,11 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.translateapp.R
 import com.example.translateapp.data.AppDatabase
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
@@ -50,29 +52,35 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import kotlin.coroutines.resume
 
-data class LanguageOption(val code: String, val displayName: String, val mlKitCode: String)
+data class LanguageOption(
+    val code: String,
+    @StringRes val displayNameResId: Int,
+    val mlKitCode: String
+) {
+    fun displayName(context: Context): String = context.getString(displayNameResId)
+}
 
-val AUTO_DETECT_OPTION = LanguageOption("auto", "Auto Detect", "auto")
+val AUTO_DETECT_OPTION = LanguageOption("auto", R.string.auto_detect, "auto")
 
 val SUPPORTED_LANGUAGES = listOf(
-    LanguageOption("en", "English", TranslateLanguage.ENGLISH),
-    LanguageOption("es", "Spanish", TranslateLanguage.SPANISH),
-    LanguageOption("fr", "French", TranslateLanguage.FRENCH),
-    LanguageOption("de", "German", TranslateLanguage.GERMAN),
-    LanguageOption("it", "Italian", TranslateLanguage.ITALIAN),
-    LanguageOption("pt", "Portuguese", TranslateLanguage.PORTUGUESE),
-    LanguageOption("zh", "Chinese", TranslateLanguage.CHINESE),
-    LanguageOption("ja", "Japanese", TranslateLanguage.JAPANESE),
-    LanguageOption("ko", "Korean", TranslateLanguage.KOREAN),
-    LanguageOption("ar", "Arabic", TranslateLanguage.ARABIC),
-    LanguageOption("ru", "Russian", TranslateLanguage.RUSSIAN),
-    LanguageOption("hi", "Hindi", TranslateLanguage.HINDI),
-    LanguageOption("ta", "Tamil", TranslateLanguage.TAMIL),
-    LanguageOption("te", "Telugu", TranslateLanguage.TELUGU),
-    LanguageOption("bn", "Bengali", TranslateLanguage.BENGALI),
-    LanguageOption("mr", "Marathi", TranslateLanguage.MARATHI),
-    LanguageOption("kn", "Kannada", TranslateLanguage.KANNADA),
-    LanguageOption("vi", "Vietnamese", TranslateLanguage.VIETNAMESE),
+    LanguageOption("en", R.string.lang_english, TranslateLanguage.ENGLISH),
+    LanguageOption("es", R.string.lang_spanish, TranslateLanguage.SPANISH),
+    LanguageOption("fr", R.string.lang_french, TranslateLanguage.FRENCH),
+    LanguageOption("de", R.string.lang_german, TranslateLanguage.GERMAN),
+    LanguageOption("it", R.string.lang_italian, TranslateLanguage.ITALIAN),
+    LanguageOption("pt", R.string.lang_portuguese, TranslateLanguage.PORTUGUESE),
+    LanguageOption("zh", R.string.lang_chinese, TranslateLanguage.CHINESE),
+    LanguageOption("ja", R.string.lang_japanese, TranslateLanguage.JAPANESE),
+    LanguageOption("ko", R.string.lang_korean, TranslateLanguage.KOREAN),
+    LanguageOption("ar", R.string.lang_arabic, TranslateLanguage.ARABIC),
+    LanguageOption("ru", R.string.lang_russian, TranslateLanguage.RUSSIAN),
+    LanguageOption("hi", R.string.lang_hindi, TranslateLanguage.HINDI),
+    //LanguageOption("ta", R.string.lang_tamil, TranslateLanguage.TAMIL),
+    //LanguageOption("te", R.string.lang_telugu, TranslateLanguage.TELUGU),
+    //LanguageOption("bn", R.string.lang_bengali, TranslateLanguage.BENGALI),
+    //LanguageOption("mr", R.string.lang_marathi, TranslateLanguage.MARATHI),
+    //LanguageOption("kn", R.string.lang_kannada, TranslateLanguage.KANNADA),
+    LanguageOption("vi", R.string.lang_vietnamese, TranslateLanguage.VIETNAMESE),
 )
 
 enum class HistoryFilter { ALL, FAVORITES }
@@ -98,7 +106,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val historyDao = db.historyDao()
     private val packDao = db.languagePackDao()
     private val downloader = ModelDownloadManager()
-    val packRepo = LanguagePackRepository(packDao, downloader, viewModelScope)
+    val packRepo = LanguagePackRepository(application, packDao, downloader, viewModelScope)
     private val billingRepo = BillingRepository(application, prefs)
 
     private val _isFirstRun = MutableStateFlow(prefs.getBoolean(PREF_IS_FIRST_RUN, true))
@@ -111,7 +119,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
     private val _appLanguageTag = MutableStateFlow(AppSettingsManager.getSavedLanguageTag(application))
     val appLanguageTag: StateFlow<String> = _appLanguageTag.asStateFlow()
-    val supportedAppLanguages: List<AppLanguageOption> = AppSettingsManager.supportedLanguages()
+    val supportedAppLanguages: List<AppLanguageOption> = AppSettingsManager.supportedLanguages(application)
 
     private val _uiMessage = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val uiMessage = _uiMessage.asSharedFlow()
@@ -245,7 +253,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _translateTargetLang.value = source
 
         viewModelScope.launch {
-            _uiMessage.emit("Downloading your selected language packs.")
+            _uiMessage.emit(appString(R.string.downloading_selected_language_packs))
             selected.forEach { lang ->
                 if (packDao.getByCode(lang.mlKitCode)?.status != PackStatus.DOWNLOADED) {
                     runCatching { packRepo.downloadPack(lang.mlKitCode, requireWifi = false) }
@@ -449,7 +457,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } catch (e: Exception) {
-                _translateError.value = e.message ?: "Translation failed."
+                _translateError.value = e.message ?: appString(R.string.translation_failed)
             } finally {
                 _translateLoading.value = false
             }
@@ -463,7 +471,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun startRecording() {
         if (!isPremium.value) {
             viewModelScope.launch {
-                _uiMessage.emit("Speech input is available in Premium.")
+                _uiMessage.emit(appString(R.string.speech_input_premium_only))
             }
             return
         }
@@ -501,17 +509,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             val app = getApplication<Application>()
             if (!ConnectivityHelper.isOnline(app)) {
-                _uiMessage.emit("No internet connection. Connect and try again.")
+                _uiMessage.emit(appString(R.string.no_internet_connection))
                 return@launch
             }
 
             if (requireWifi && !ConnectivityHelper.isWifiConnected(app)) {
-                _uiMessage.emit("Wi-Fi is required to download this language pack.")
+                _uiMessage.emit(appString(R.string.wifi_required_for_language_pack))
                 return@launch
             }
 
             if (!canDownloadPack(mlKitCode)) {
-                _uiMessage.emit("Free plan limit reached. Delete one downloaded language before downloading another.")
+                _uiMessage.emit(appString(R.string.free_plan_limit_delete_one_language))
                 return@launch
             }
 
@@ -525,12 +533,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 stopPackProgressSimulation(mlKitCode)
                 updatePackProgress(mlKitCode, 100)
                 val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-                _uiMessage.emit("${lang?.displayName ?: mlKitCode} ready!")
+                _uiMessage.emit(appString(R.string.language_ready_template, lang?.displayName(app) ?: mlKitCode))
                 reconcileFreeLanguagesWithCurrentState()
             } catch (e: Exception) {
                 stopPackProgressSimulation(mlKitCode)
-                val message = e.message?.takeIf { it.isNotBlank() } ?: "Please check your connection and try again."
-                _uiMessage.emit("Download failed: $message")
+                val message = e.message?.takeIf { it.isNotBlank() } ?: appString(R.string.please_check_connection_and_try_again)
+                _uiMessage.emit(appString(R.string.download_failed_template, message))
             } finally {
                 _downloadingPacks.value = _downloadingPacks.value - mlKitCode
                 _packDownloadProgress.value = _packDownloadProgress.value - mlKitCode
@@ -547,7 +555,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _packDownloadProgress.value = _packDownloadProgress.value - mlKitCode
         viewModelScope.launch {
             packRepo.markPackNotDownloaded(mlKitCode)
-            _uiMessage.emit("Download cancelled.")
+            _uiMessage.emit(appString(R.string.download_cancelled))
         }
     }
 
@@ -555,7 +563,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             packRepo.deletePack(mlKitCode)
             val lang = SUPPORTED_LANGUAGES.find { it.mlKitCode == mlKitCode }
-            _uiMessage.emit("${lang?.displayName ?: mlKitCode} removed.")
+            _uiMessage.emit(appString(R.string.language_removed_template, lang?.displayName(getApplication()) ?: mlKitCode))
             reconcileFreeLanguagesWithCurrentState()
         }
     }
@@ -850,9 +858,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 sourceText = text,
                 translatedText = result,
                 sourceLangCode = src.code,
-                sourceLangName = src.displayName,
+                sourceLangName = src.displayName(getApplication()),
                 targetLangCode = tgt.code,
-                targetLangName = tgt.displayName
+                targetLangName = tgt.displayName(getApplication())
             )
         )
     }
@@ -879,14 +887,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         val prospectiveTotal = _freeWordsUsed.value + countWords(text)
         if (prospectiveTotal > FREE_WORD_LIMIT) {
-            throw IllegalStateException("Free plan limit reached. Upgrade for unlimited translations.")
+            throw IllegalStateException(appString(R.string.free_plan_limit_upgrade_unlimited))
         }
     }
 
     private suspend fun ensureFreePlanAllowsLanguagePair(src: LanguageOption, tgt: LanguageOption) {
         val allowed = _freePlanLanguages.value.map { it.code }.toSet()
         if (src.code !in allowed || tgt.code !in allowed) {
-            throw IllegalStateException("Free plan supports only your two selected languages.")
+            throw IllegalStateException(appString(R.string.free_plan_supports_only_selected_languages))
         }
     }
 
@@ -900,7 +908,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun buildOfflineError(src: LanguageOption, tgt: LanguageOption): String {
-        return "You're offline and the ${src.displayName} to ${tgt.displayName} packs are not ready."
+        return appString(
+            R.string.offline_packs_not_ready_template,
+            src.displayName(getApplication()),
+            tgt.displayName(getApplication())
+        )
     }
 
     private fun countWords(text: String): Int {
@@ -1009,5 +1021,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 ?: _freePlanLanguages.value.firstOrNull { it.code != _translateSourceLang.value.code }
                 ?: DEFAULT_FREE_LANGUAGE
         }
+    }
+
+    private fun appString(@StringRes resId: Int, vararg args: Any): String {
+        return getApplication<Application>().getString(resId, *args)
     }
 }

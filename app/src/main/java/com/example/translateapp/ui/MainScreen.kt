@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.translateapp.R
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -105,7 +106,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 }
                 composable("source_picker") {
                     LanguagePickerScreen(
-                        title = "Translate from",
+                        titleRes = R.string.translate_from,
                         selected = vm.translateSourceLang.collectAsState().value,
                         options = vm.getSelectableSourceLanguages(),
                         downloadedCodes = downloadedCodes,
@@ -119,7 +120,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 }
                 composable("target_picker") {
                     LanguagePickerScreen(
-                        title = "Translate to",
+                        titleRes = R.string.translate_to,
                         selected = vm.translateTargetLang.collectAsState().value,
                         options = vm.getSelectableTargetLanguages(),
                         downloadedCodes = downloadedCodes,

@@ -63,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +87,7 @@ fun ModernTranslateScreen(
     onNavigateToSourcePicker: () -> Unit,
     onNavigateToTargetPicker: () -> Unit
 ) {
+    val context = LocalContext.current
     val input by vm.translateInput.collectAsState()
     val translatedText by vm.translatedText.collectAsState()
     val sourceLang by vm.translateSourceLang.collectAsState()
@@ -112,11 +114,13 @@ fun ModernTranslateScreen(
         error = error,
         translatedText = translatedText,
         sourceLanguage = if (sourceLang.code == "auto") {
-            detectedLang?.let { "Auto (${it.displayName})" } ?: "Auto Detect"
+            detectedLang?.let { context.getString(R.string.auto_detect_with_language,
+                it.displayName(context)) }
+                ?: context.getString(R.string.auto_detect)
         } else {
-            sourceLang.displayName
+            sourceLang.displayName(context)
         },
-        targetLanguage = targetLang.displayName,
+        targetLanguage = targetLang.displayName(context),
         isRecording = isRecording,
         isSpeaking = isSpeaking,
         historyCount = historyItems.size,
@@ -215,7 +219,7 @@ private fun MainTranslateView(
                                 Badge { Text(historyCount.coerceAtMost(99).toString()) }
                             }
                         }) {
-                            Icon(Icons.Rounded.History, contentDescription = "History")
+                            Icon(Icons.Rounded.History, contentDescription = stringResource(R.string.history_title))
                         }
                     }
                 },
@@ -225,7 +229,7 @@ private fun MainTranslateView(
                             IconButton(
                                 onClick = onClearInput
                             ) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Clear")
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.clear))
                             }
                         }
 
@@ -322,7 +326,7 @@ private fun MainTranslateView(
                             containerColor = colorScheme.primary.copy(0.1f))) {
                             Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Speak")
+                            Text(stringResource(R.string.speak))
                         }
                     }
 
@@ -333,7 +337,7 @@ private fun MainTranslateView(
                                 containerColor = colorScheme.primary.copy(0.1f))){
                             Icon(Icons.Default.Stop, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Stop")
+                            Text(stringResource(R.string.stop))
                         }
                     }
                     //Spacer(modifier = Modifier.height(12.dp))
@@ -365,7 +369,7 @@ private fun MainTranslateView(
                             IconButton(onClick = onLanguageSwap, modifier = Modifier.padding(horizontal = 8.dp)) {
                                 Icon(
                                     Icons.Default.SwapHoriz,
-                                    contentDescription = "Swap",
+                                    contentDescription = stringResource(R.string.swap),
                                     tint = colorScheme.primary,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -392,7 +396,7 @@ private fun MainTranslateView(
                                 ) {
                                     Icon(Icons.Default.Translate, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Translate")
+                                    Text(stringResource(R.string.translate))
                                 }
                                 Button(
                                     onClick = onPrimaryAction,
@@ -404,7 +408,7 @@ private fun MainTranslateView(
                                         contentDescription = null
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if (isRecording) "Listening" else "Speak")
+                                    Text(if (isRecording) stringResource(R.string.listening) else stringResource(R.string.speak))
                                 }
                             }
                         } else {
@@ -419,7 +423,7 @@ private fun MainTranslateView(
                             ) {
                                 Icon(Icons.Default.Translate, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Translate")
+                                Text(stringResource(R.string.translate))
                             }
                         }
 
@@ -446,7 +450,7 @@ private fun LinearLoadingRow() {
     ) {
         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
         Spacer(modifier = Modifier.width(10.dp))
-        Text("Translating...")
+        Text(stringResource(R.string.translating))
     }
 }
 
@@ -468,11 +472,12 @@ fun LanguageItem(
     supportingText: String,
     onSelect: (LanguageOption) -> Unit
 ) {
+    val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     ListItem(
         headlineContent = {
             Text(
-                text = lang.displayName,
+                text = lang.displayName(context),
                 fontWeight = if (lang.code == selected.code || enabled) FontWeight.SemiBold else FontWeight.Normal,
                 color = if((lang.code == selected.code) && enabled){
                     colors.primary
@@ -483,14 +488,15 @@ fun LanguageItem(
         },
         supportingContent = {
             Text(
-                supportingText,
+                fontSize = 13.sp,
+                text = supportingText,
                 color = if (enabled) colors.onSecondary else colors.onSecondary.copy(alpha = 0.8f)
             )
         },
         trailingContent = {
             when {
-                lang.code == selected.code -> Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color(0xFF1F6FEB))
-                !enabled -> Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color.Gray)
+                lang.code == selected.code -> Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected), tint = Color(0xFF1F6FEB))
+                !enabled -> Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.locked), tint = Color.Gray)
             }
         },
         colors = ListItemDefaults.colors(containerColor =
@@ -513,7 +519,7 @@ private fun LanguageButton(
         color = colors.surface,
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(56.dp),
+        modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(16.dp),
         border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
     ) {
@@ -544,16 +550,15 @@ private fun KeyboardLanguageBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 0.dp, vertical = 0.dp),
         shape = RoundedCornerShape(0.dp),
-        color = colorScheme.surface.copy(alpha = 0.96f),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 0.dp, vertical = 0.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -565,14 +570,14 @@ private fun KeyboardLanguageBar(
             )
             Surface(
                 onClick = onLanguageSwap,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = colorScheme.primary.copy(alpha = 0.08f),
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(28.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Default.SwapHoriz,
-                        contentDescription = "Swap",
+                        contentDescription = stringResource(R.string.swap),
                         tint = colorScheme.primary
                     )
                 }
@@ -596,17 +601,16 @@ private fun KeyboardLanguageButton(
 ) {
     val colors = colorScheme
     Surface(
-        color = colors.surfaceVariant.copy(alpha = 0.85f),
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(52.dp),
+        modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(18.dp),
         border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = text,
-                color = colors.onSurface.copy(alpha = if (enabled) 1f else 0.7f),
+                color = colors.onPrimaryContainer.copy(alpha = if (enabled) 1f else 0.7f),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,

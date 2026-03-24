@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ fun LanguageDropdown(
     options: List<LanguageOption> = SUPPORTED_LANGUAGES
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val maxHeight = screenHeight * 0.6f
@@ -32,7 +34,7 @@ fun LanguageDropdown(
             onClick = { expanded = true },
             contentPadding = ButtonDefaults.TextButtonContentPadding
         ) {
-            Text(selected.displayName, style = MaterialTheme.typography.labelLarge)
+            Text(selected.displayName(context), style = MaterialTheme.typography.labelLarge)
         }
         DropdownMenu(
             expanded = expanded,
@@ -41,7 +43,7 @@ fun LanguageDropdown(
         ) {
             options.forEach { lang ->
                 DropdownMenuItem(
-                    text = { Text(lang.displayName) },
+                    text = { Text(lang.displayName(context)) },
                     onClick = {
                         onSelect(lang)
                         expanded = false

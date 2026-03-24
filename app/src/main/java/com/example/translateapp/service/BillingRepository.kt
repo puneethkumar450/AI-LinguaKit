@@ -3,6 +3,7 @@ package com.example.translateapp.service
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -13,6 +14,7 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
+import com.example.translateapp.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +33,7 @@ class BillingRepository(
     context: Context,
     private val prefs: SharedPreferences
 ) {
+    private val appContext = context.applicationContext
     private val _isPremium = MutableStateFlow(prefs.getBoolean(PREF_PREMIUM_CACHED, false))
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
@@ -49,10 +52,10 @@ class BillingRepository(
                 purchases.forEach(::handlePurchase)
             }
             billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> {
-                _billingMessage.value = "Purchase canceled."
+                _billingMessage.value = string(R.string.purchase_canceled)
             }
             billingResult.responseCode != BillingClient.BillingResponseCode.OK -> {
-                _billingMessage.value = billingResult.debugMessage.ifBlank { "Purchase failed." }
+                _billingMessage.value = billingResult.debugMessage.ifBlank { string(R.string.purchase_failed) }
             }
         }
     }
@@ -82,7 +85,7 @@ class BillingRepository(
                     queryPremiumProduct()
                 } else {
                     _billingReady.value = false
-                    _billingMessage.value = billingResult.debugMessage.ifBlank { "Billing unavailable." }
+                    _billingMessage.value = billingResult.debugMessage.ifBlank { string(R.string.billing_unavailable) }
                 }
             }
 
@@ -107,12 +110,12 @@ class BillingRepository(
 
     fun launchPurchase(activity: Activity): Boolean {
         val product = _premiumProduct.value ?: run {
-            _billingMessage.value = "Premium purchase is not available yet."
+            _billingMessage.value = string(R.string.premium_purchase_not_available)
             return false
         }
         if (!billingClient.isReady) {
             connect()
-            _billingMessage.value = "Billing is still connecting. Please try again."
+            _billingMessage.value = string(R.string.billing_connecting_try_again)
             return false
         }
 
@@ -175,7 +178,7 @@ class BillingRepository(
                     ?.firstOrNull()
                     ?.formattedPrice
                 else -> details.oneTimePurchaseOfferDetails?.formattedPrice
-            } ?: "See Play Store"
+            } ?: string(R.string.see_play_store)
 
             if (_premiumProduct.value == null || productType == BillingClient.ProductType.SUBS) {
                 _premiumProduct.value = PremiumProduct(details, productType, price)
@@ -213,7 +216,7 @@ class BillingRepository(
                 billingClient.acknowledgePurchase(params) { result ->
                     if (result.responseCode != BillingClient.BillingResponseCode.OK) {
                         _billingMessage.value = result.debugMessage.ifBlank {
-                            "Premium purchase acknowledged locally. Verify in Play Console if needed."
+                            string(R.string.premium_purchase_acknowledged_locally)
                         }
                     }
                 }
@@ -233,5 +236,9 @@ class BillingRepository(
 
     fun endConnection() {
         billingClient.endConnection()
+    }
+
+    private fun string(@StringRes resId: Int, vararg args: Any): String {
+        return appContext.getString(resId, *args)
     }
 }

@@ -15,11 +15,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.translateapp.R
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.ui.theme.TranslateAppTheme
 import com.example.translateapp.viewmodel.AppViewModel
@@ -85,6 +88,7 @@ private fun TranslateScreenContent(
     onSpeak: (String, String) -> Unit,
     onStopSpeaking: () -> Unit
 ) {
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val bothReady = srcReady && tgtReady
 
@@ -113,7 +117,7 @@ private fun TranslateScreenContent(
             IconButton(onClick = onSwapLanguages) {
                 Icon(
                     Icons.Default.SwapHoriz,
-                    contentDescription = "Swap languages",
+                    contentDescription = stringResource(R.string.swap_languages),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -131,8 +135,8 @@ private fun TranslateScreenContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 120.dp),
-            placeholder = { Text("Enter text to translate…") },
-            label = { Text("Source text") },
+            placeholder = { Text(stringResource(R.string.enter_text_to_translate)) },
+            label = { Text(stringResource(R.string.source_text)) },
             maxLines = 8,
             shape = RoundedCornerShape(12.dp)
         )
@@ -159,7 +163,7 @@ private fun TranslateScreenContent(
                     strokeWidth = 2.dp
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Translating…")
+                Text(stringResource(R.string.translating_ellipsis))
             } else {
                 Icon(
                     if (bothReady) Icons.Default.OfflinePin else Icons.Default.Language,
@@ -167,7 +171,7 @@ private fun TranslateScreenContent(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (bothReady) "Translate (offline)" else "Translate",
+                    if (bothReady) stringResource(R.string.translate_offline) else stringResource(R.string.translate),
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -207,7 +211,7 @@ private fun TranslateScreenContent(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                "Translation (${targetLang.displayName})",
+                                stringResource(R.string.translation_with_language, targetLang.displayName(context)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
@@ -225,7 +229,7 @@ private fun TranslateScreenContent(
                             ) {
                                 Icon(
                                     if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                    contentDescription = "Speak",
+                                    contentDescription = stringResource(R.string.speak),
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
@@ -236,7 +240,7 @@ private fun TranslateScreenContent(
                             ) {
                                 Icon(
                                     Icons.Default.ContentCopy,
-                                    contentDescription = "Copy",
+                                    contentDescription = stringResource(R.string.copy),
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
@@ -263,15 +267,15 @@ private fun TranslateSourceBadge(source: TranslateSource) {
     if (source == TranslateSource.NONE) return
     val (icon, label, bgColor, textColor) = when (source) {
         TranslateSource.OFFLINE -> Quad(
-            Icons.Default.OfflinePin, "offline",
+            Icons.Default.OfflinePin, stringResource(R.string.offline),
             Color(0xFFDCFCE7), Color(0xFF15803D)
         )
         TranslateSource.ONLINE -> Quad(
-            Icons.Default.Language, "online",
+            Icons.Default.Language, stringResource(R.string.online),
             Color(0xFFDBEAFE), Color(0xFF1D4ED8)
         )
         TranslateSource.HISTORY -> Quad(
-            Icons.Default.History, "from cache",
+            Icons.Default.History, stringResource(R.string.from_cache),
             Color(0xFFFEF9C3), Color(0xFF854D0E)
         )
         else -> return
@@ -299,6 +303,7 @@ private fun OfflineReadinessBanner(
     srcLang: LanguageOption,
     tgtLang: LanguageOption
 ) {
+    val context = LocalContext.current
     val bothReady = srcReady && tgtReady
     if (bothReady) {
         // Fully offline — best case
@@ -315,7 +320,7 @@ private fun OfflineReadinessBanner(
                 Icon(Icons.Default.OfflinePin, contentDescription = null,
                     tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
                 Text(
-                    "Language packs ready — works without internet",
+                    stringResource(R.string.language_packs_ready_works_without_internet),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF15803D)
                 )
@@ -324,8 +329,8 @@ private fun OfflineReadinessBanner(
     } else {
         // Packs missing — online translate will be used, or history fallback if offline
         val missing = buildList {
-            if (!srcReady) add(srcLang.displayName)
-            if (!tgtReady) add(tgtLang.displayName)
+            if (!srcReady) add(srcLang.displayName(context))
+            if (!tgtReady) add(tgtLang.displayName(context))
         }
         Card(
             shape = RoundedCornerShape(10.dp),
@@ -342,7 +347,10 @@ private fun OfflineReadinessBanner(
                 Icon(Icons.Default.CloudDownload, contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
                 Text(
-                    "${missing.joinToString(" & ")} model${if (missing.size > 1) "s" else ""} not downloaded — tap Translate to auto-download, or go to Language Packs.",
+                    stringResource(
+                        if (missing.size > 1) R.string.models_not_downloaded_template else R.string.model_not_downloaded_template,
+                        missing.joinToString(stringResource(R.string.and_separator))
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
@@ -360,12 +368,13 @@ private fun LanguageDropdownWithStatus(
     onSelect: (LanguageOption) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val allLanguages = SUPPORTED_LANGUAGES
 
     Box {
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
             OutlinedTextField(
-                value = selected.displayName,
+                value = selected.displayName(context),
                 onValueChange = {},
                 readOnly = true,
                 leadingIcon = {
@@ -387,7 +396,7 @@ private fun LanguageDropdownWithStatus(
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 allLanguages.forEach { lang ->
                     DropdownMenuItem(
-                        text = { Text(lang.displayName) },
+                        text = { Text(lang.displayName(context)) },
                         onClick = { onSelect(lang); expanded = false },
                         contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                     )

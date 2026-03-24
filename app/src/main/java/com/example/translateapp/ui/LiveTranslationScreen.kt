@@ -19,11 +19,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.translateapp.R
 import com.example.translateapp.ui.theme.TranslateAppTheme
 import com.example.translateapp.viewmodel.AppViewModel
 import com.example.translateapp.viewmodel.LanguageOption
@@ -77,7 +79,7 @@ fun LiveTranslationScreenContent(
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Camera permission is required for Live Translation")
+            Text(stringResource(R.string.camera_permission_required_live_translation))
         }
     }
 }
@@ -193,13 +195,13 @@ private fun CameraView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
                 }
                 
                 // Language Selection in AR Mode
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Target:", 
+                        stringResource(R.string.target_label),
                         style = MaterialTheme.typography.labelMedium, 
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -219,7 +221,7 @@ private fun CameraView(
                 ) {
                     Icon(
                         if (isFlashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                        contentDescription = "Toggle Flash",
+                        contentDescription = stringResource(R.string.toggle_flash),
                         tint = Color.White
                     )
                 }
@@ -243,13 +245,13 @@ private fun CameraView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Detected Text", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.detected_text), style = MaterialTheme.typography.labelSmall)
                             Button(
                                 onClick = { onTranslateNow(block.text) },
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                 modifier = Modifier.height(32.dp)
                             ) {
-                                Text("Translate Now", style = MaterialTheme.typography.labelSmall)
+                                Text(stringResource(R.string.translate_now), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         Spacer(Modifier.height(4.dp))

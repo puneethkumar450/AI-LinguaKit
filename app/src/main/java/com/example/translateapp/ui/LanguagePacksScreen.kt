@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -158,18 +159,18 @@ private fun LanguagePacksContent(
                     ) {
                         Column {
                             Text(
-                                "Offline Language Packs",
+                                stringResource(R.string.offline_language_packs),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                "$downloadedCount / $totalCount downloaded • ~${storageUsedMb} MB used",
+                                stringResource(R.string.downloaded_summary_template, downloadedCount, totalCount, storageUsedMb),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = onRefresh) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                             }
                         }
                     }
@@ -198,13 +199,13 @@ private fun LanguagePacksContent(
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
-                            Text(if (wifiOnly) "Wi-Fi only" else "Any network")
+                            Text(if (wifiOnly) stringResource(R.string.wifi_only) else stringResource(R.string.any_network))
                             Switch(checked = wifiOnly, onCheckedChange = { wifiOnly = it })
                         }
 
                         if (!isPremium) {
                             Text(
-                                "Free plan: 3 languages max",
+                                stringResource(R.string.free_plan_languages_max),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.secondary
                             )
@@ -219,9 +220,7 @@ private fun LanguagePacksContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    //Icon(Icons.Default.Info, contentDescription = null)
-                    Text("Delete a downloaded language to free a slot, then download a new one.",
-                        fontSize = 12.sp)
+                    Text(stringResource(R.string.delete_downloaded_language_hint), fontSize = 12.sp)
                 }
             }
 
@@ -234,7 +233,7 @@ private fun LanguagePacksContent(
 
                 if (downloadedPacks.isNotEmpty()) {
                     item {
-                        SectionHeader("Downloaded (${downloadedPacks.size})", Icons.Default.CheckCircle, Color(0xFF16A34A))
+                        SectionHeader(stringResource(R.string.downloaded_section_template, downloadedPacks.size), Icons.Default.CheckCircle, Color(0xFF16A34A))
                     }
                     items(downloadedPacks, key = { it.mlKitCode }) { pack ->
                         PackCard(
@@ -250,7 +249,7 @@ private fun LanguagePacksContent(
 
                 if (otherPacks.isNotEmpty()) {
                     item {
-                        SectionHeader("Not Downloaded (${otherPacks.size})", Icons.Default.CloudOff, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        SectionHeader(stringResource(R.string.not_downloaded_section_template, otherPacks.size), Icons.Default.CloudOff, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                     }
                     items(otherPacks, key = { it.mlKitCode }) { pack ->
                         PackCard(
@@ -275,9 +274,8 @@ private fun LanguagePacksContent(
         showDeleteDialog?.let { pack ->
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = null },
-                //icon = { Icon(Icons.Default.DeleteForever, contentDescription = null) },
-                title = { Text("Remove ${pack.displayName}?") },
-                text = { Text("This frees one free-plan slot so you can download another language.") },
+                title = { Text(stringResource(R.string.remove_language_title, pack.displayName)) },
+                text = { Text(stringResource(R.string.remove_language_message)) },
                 confirmButton = {
                     TextButton(
                         colors = ButtonDefaults.textButtonColors(
@@ -288,10 +286,10 @@ private fun LanguagePacksContent(
                             onDelete(pack.mlKitCode)
                             showDeleteDialog = null
                         }
-                    ) { Text("Remove") }
+                    ) { Text(stringResource(R.string.remove)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = null }) { Text("Cancel") }
+                    TextButton(onClick = { showDeleteDialog = null }) { Text(stringResource(R.string.history_clear_cancel)) }
                 }
             )
         }
@@ -299,17 +297,16 @@ private fun LanguagePacksContent(
         showUpgradeDialog?.let { pack ->
             AlertDialog(
                 onDismissRequest = { showUpgradeDialog = null },
-                //icon = { Icon(Icons.Default.Star, contentDescription = null) },
-                title = { Text("Free plan limit reached") },
+                title = { Text(stringResource(R.string.free_plan_limit_reached)) },
                 text = {
-                    Text("You are using the free plan. Delete one downloaded language to download ${pack.displayName}.")
+                    Text(stringResource(R.string.free_plan_delete_language_to_download_template, pack.displayName))
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             showUpgradeDialog = null
                         }
-                    ) { Text("OK") }
+                    ) { Text(stringResource(R.string.ok)) }
                 }
             )
         }
@@ -382,10 +379,10 @@ private fun PackCard(
                 Text(pack.displayName, fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondary)
                 val subtitle = when {
-                    isDownloading -> "Downloading... $progressPercent%"
-                    pack.status == PackStatus.DOWNLOADED -> "Ready offline • downloaded ${dateFormatter.format(Date(pack.downloadedAtMs))}"
-                    pack.status == PackStatus.FAILED -> "Failed: ${pack.errorMessage ?: "unknown error"}"
-                    else -> "~${pack.approximateSizeKb / 1024} MB"
+                    isDownloading -> stringResource(R.string.downloading_progress_template, progressPercent)
+                    pack.status == PackStatus.DOWNLOADED -> stringResource(R.string.ready_offline_downloaded_template, dateFormatter.format(Date(pack.downloadedAtMs)))
+                    pack.status == PackStatus.FAILED -> stringResource(R.string.failed_with_error_template, pack.errorMessage ?: stringResource(R.string.unknown_error))
+                    else -> stringResource(R.string.approx_size_mb_template, pack.approximateSizeKb / 1024)
                 }
                 Text(
                     subtitle,
@@ -416,15 +413,15 @@ private fun PackCard(
                 when (state) {
                     "loading" -> IconButton(onClick = onCancelDownload) {
                         Icon(Icons.Default.Stop,
-                            contentDescription = "Cancel download", tint = MaterialTheme.colorScheme.error)
+                            contentDescription = stringResource(R.string.cancel_download), tint = MaterialTheme.colorScheme.error)
                     }
                     "delete" -> IconButton(onClick = onDelete) {
                         Icon(Icons.Rounded.Delete,
-                            contentDescription = "Remove",
+                            contentDescription = stringResource(R.string.remove),
                             tint = MaterialTheme.colorScheme.error)
                     }
                     else -> IconButton(onClick = onDownload) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = "Download")
+                        Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.download))
                     }
                 }
             }

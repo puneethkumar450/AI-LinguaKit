@@ -1,5 +1,6 @@
 package com.example.translateapp.service
 
+import android.content.Context
 import android.util.Log
 import com.example.translateapp.data.LanguagePackDao
 import com.example.translateapp.data.LanguagePackEntity
@@ -26,6 +27,7 @@ private const val TAG = "LangPackRepo"
  *  - Provide download / delete operations that update both ML Kit and Room
  */
 class LanguagePackRepository(
+    private val context: Context,
     private val dao: LanguagePackDao,
     private val downloader: ModelDownloadManager,
     private val scope: CoroutineScope
@@ -54,7 +56,7 @@ class LanguagePackRepository(
             val seeds = SUPPORTED_LANGUAGES.map { lang ->
                 LanguagePackEntity(
                     mlKitCode = lang.mlKitCode,
-                    displayName = lang.displayName
+                    displayName = lang.displayName(context)
                 )
             }
             dao.insertAllIfAbsent(seeds)

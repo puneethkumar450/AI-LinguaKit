@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,7 @@ fun LanguageOptionItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Card(shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -121,7 +123,7 @@ fun LanguageOptionItem(
                     selected = isSelected,
                     onClick = onClick
                 )
-                Text(option.displayName, color = MaterialTheme.colorScheme.onSecondary)
+                Text(option.displayName(context), color = MaterialTheme.colorScheme.onSecondary)
             }
             if (isSelected) {
                 Icon(Icons.Default.Check, contentDescription = null,
@@ -134,10 +136,11 @@ fun LanguageOptionItem(
 @Preview(showBackground = true)
 @Composable
 fun LanguageChangeScreenUIPreview() {
+    val context = LocalContext.current
     TranslateAppTheme(darkTheme = true) {
         LanguageChangeScreenUIContent(
             appLanguageTag = "en",
-            supportedLanguages = AppSettingsManager.supportedLanguages(),
+            supportedLanguages = AppSettingsManager.supportedLanguages(context),
             onLanguageSelect = {},
             onBack = {}
         )
@@ -149,7 +152,7 @@ fun LanguageChangeScreenUIPreview() {
 fun LanguageChangeScreenItemUIPreview() {
     TranslateAppTheme {
         LanguageOptionItem(
-            option = AppLanguageOption("en", "English"),
+            option = AppLanguageOption("en", R.string.lang_english),
             isSelected = true,
             onClick = {}
         )

@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -119,7 +120,7 @@ fun OneTimeLanguagePicker(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "English is included by default. Select 2 more languages to download.",
+                        text = stringResource(R.string.english_included_select_two_more),
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -149,6 +150,7 @@ fun LanguageGridItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val borderColor = if (isSelected) Color(0xFFE91E63) else Color(0xFFF5F5F5)
     
     Card(
@@ -175,7 +177,7 @@ fun LanguageGridItem(
             )
             
             Text(
-                text = language.displayName,
+                text = language.displayName(context),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp

@@ -63,6 +63,122 @@
     <string name="history_star_desc">Star</string>
     <string name="history_unstar_desc">Unstar</string>
 
+    <string name="translate_from">Translate from</string>
+    <string name="translate_to">Translate to</string>
+    <string name="translate_to_label">Translate to:</string>
+    <string name="translate">Translate</string>
+    <string name="translate_offline">Translate (offline)</string>
+    <string name="translating">Translating...</string>
+    <string name="translating_ellipsis">Translating…</string>
+    <string name="translate_now">Translate Now</string>
+    <string name="source_text">Source text</string>
+    <string name="enter_text_to_translate">Enter text to translate…</string>
+    <string name="translation_with_language">Translation (%1$s)</string>
+    <string name="speak">Speak</string>
+    <string name="stop">Stop</string>
+    <string name="stop_audio">Stop Audio</string>
+    <string name="clear">Clear</string>
+    <string name="copy">Copy</string>
+    <string name="close">Close</string>
+    <string name="swap">Swap</string>
+    <string name="swap_languages">Swap languages</string>
+    <string name="selected">Selected</string>
+    <string name="locked">Locked</string>
+    <string name="offline">offline</string>
+    <string name="online">online</string>
+    <string name="from_cache">from cache</string>
+    <string name="listening">Listening</string>
+    <string name="listening_ellipsis">Listening...</string>
+    <string name="tap_to_speak">Tap to speak</string>
+    <string name="speech_to_speech">Speech to Speech</string>
+    <string name="recognized">Recognized</string>
+    <string name="recognized_with_language">Recognized (%1$s)</string>
+    <string name="start_recording">Start Recording</string>
+    <string name="stop_recording">Stop Recording</string>
+    <string name="initializing_speech_services">Initializing speech services...</string>
+    <string name="camera_permission_required_live_translation">Camera permission is required for Live Translation</string>
+    <string name="target_label">Target:</string>
+    <string name="toggle_flash">Toggle Flash</string>
+    <string name="detected_text">Detected Text</string>
+    <string name="downloaded_packs">Downloaded Packs</string>
+    <string name="ready_to_use">Ready to use</string>
+    <string name="other_languages">Other Languages</string>
+    <string name="download_from_language_packs_first">Download from Language Packs first</string>
+    <string name="english_included_select_two_more">English is included by default. Select 2 more languages to download.</string>
+    <string name="reuse">Reuse</string>
+    <string name="delete">Delete</string>
+    <string name="tap_to_see_translation">Tap to see translation →</string>
+    <string name="offline_language_packs">Offline Language Packs</string>
+    <string name="downloaded_summary_template">%1$d / %2$d downloaded • ~%3$d MB used</string>
+    <string name="refresh">Refresh</string>
+    <string name="wifi_only">Wi-Fi only</string>
+    <string name="any_network">Any network</string>
+    <string name="free_plan_languages_max">Free plan: 3 languages max</string>
+    <string name="delete_downloaded_language_hint">Delete a downloaded language to free a slot, then download a new one.</string>
+    <string name="downloaded_section_template">Downloaded (%1$d)</string>
+    <string name="not_downloaded_section_template">Not Downloaded (%1$d)</string>
+    <string name="remove_language_title">Remove %1$s?</string>
+    <string name="remove_language_message">This frees one free-plan slot so you can download another language.</string>
+    <string name="remove">Remove</string>
+    <string name="free_plan_limit_reached">Free plan limit reached</string>
+    <string name="free_plan_delete_language_to_download_template">You are using the free plan. Delete one downloaded language to download %1$s.</string>
+    <string name="ok">OK</string>
+    <string name="downloading_progress_template">Downloading... %1$d%%</string>
+    <string name="ready_offline_downloaded_template">Ready offline • downloaded %1$s</string>
+    <string name="failed_with_error_template">Failed: %1$s</string>
+    <string name="unknown_error">unknown error</string>
+    <string name="approx_size_mb_template">~%1$d MB</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="download">Download</string>
+    <string name="language_packs_ready_works_without_internet">Language packs ready — works without internet</string>
+    <string name="model_not_downloaded_template">%1$s model not downloaded — tap Translate to auto-download, or go to Language Packs.</string>
+    <string name="models_not_downloaded_template">%1$s models not downloaded — tap Translate to auto-download, or go to Language Packs.</string>
+    <string name="and_separator" translatable="false"> &amp; </string>
+    <string name="purchase_canceled">Purchase canceled.</string>
+    <string name="purchase_failed">Purchase failed.</string>
+    <string name="billing_unavailable">Billing unavailable.</string>
+    <string name="premium_purchase_not_available">Premium purchase is not available yet.</string>
+    <string name="billing_connecting_try_again">Billing is still connecting. Please try again.</string>
+    <string name="see_play_store">See Play Store</string>
+    <string name="premium_purchase_acknowledged_locally">Premium purchase acknowledged locally. Verify in Play Console if needed.</string>
+    <string name="downloading_selected_language_packs">Downloading your selected language packs.</string>
+    <string name="translation_failed">Translation failed.</string>
+    <string name="speech_input_premium_only">Speech input is available in Premium.</string>
+    <string name="no_internet_connection">No internet connection. Connect and try again.</string>
+    <string name="wifi_required_for_language_pack">Wi-Fi is required to download this language pack.</string>
+    <string name="free_plan_limit_delete_one_language">Free plan limit reached. Delete one downloaded language before downloading another.</string>
+    <string name="language_ready_template">%1$s ready!</string>
+    <string name="please_check_connection_and_try_again">Please check your connection and try again.</string>
+    <string name="download_failed_template">Download failed: %1$s</string>
+    <string name="download_cancelled">Download cancelled.</string>
+    <string name="language_removed_template">%1$s removed.</string>
+    <string name="free_plan_limit_upgrade_unlimited">Free plan limit reached. Upgrade for unlimited translations.</string>
+    <string name="free_plan_supports_only_selected_languages">Free plan supports only your two selected languages.</string>
+    <string name="offline_packs_not_ready_template">You\'re offline and the %1$s to %2$s packs are not ready.</string>
+    <string name="auto_detect">Auto Detect</string>
+    <string name="auto_detect_with_language">Auto (%1$s)</string>
+    <string name="system_default">System default</string>
+    <string name="lang_english" translatable="false">English</string>
+    <string name="lang_spanish" translatable="false">Spanish</string>
+    <string name="lang_french" translatable="false">French</string>
+    <string name="lang_german" translatable="false">German</string>
+    <string name="lang_italian" translatable="false">Italian</string>
+    <string name="lang_portuguese" translatable="false">Portuguese</string>
+    <string name="lang_portuguese_brazil" translatable="false">Portuguese (Brazil)</string>
+    <string name="lang_chinese" translatable="false">Chinese</string>
+    <string name="lang_chinese_simplified" translatable="false">Chinese (Simplified)</string>
+    <string name="lang_japanese" translatable="false">Japanese</string>
+    <string name="lang_korean" translatable="false">Korean</string>
+    <string name="lang_arabic" translatable="false">Arabic</string>
+    <string name="lang_russian" translatable="false" >Russian</string>
+    <string name="lang_hindi" translatable="false">Hindi</string>
+    <string name="lang_tamil" translatable="false">Tamil</string>
+    <string name="lang_telugu" translatable="false">Telugu</string>
+    <string name="lang_bengali" translatable="false">Bengali</string>
+    <string name="lang_marathi" translatable="false">Marathi</string>
+    <string name="lang_kannada" translatable="false">Kannada</string>
+    <string name="lang_vietnamese" translatable="false">Vietnamese</string>
+
     <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
     <string name="admob_banner_unit_id" translatable="false">ca-app-pub-3940256099942544/9214589741</string>
 

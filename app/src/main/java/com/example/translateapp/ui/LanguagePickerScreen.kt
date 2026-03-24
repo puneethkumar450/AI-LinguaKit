@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.translateapp.R
@@ -32,7 +33,7 @@ import com.example.translateapp.viewmodel.LanguageOption
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguagePickerScreen(
-    title: String,
+    titleRes: Int,
     selected: LanguageOption,
     options: List<LanguageOption>,
     downloadedCodes: Set<String> = emptySet(),
@@ -40,10 +41,11 @@ fun LanguagePickerScreen(
     onSelect: (LanguageOption) -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(stringResource(titleRes)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -53,9 +55,12 @@ fun LanguagePickerScreen(
         }
     ) { padding ->
         var searchQuery by remember { mutableStateOf("") }
-        val filteredOptions = remember(searchQuery, options) {
+        val localizedOptions = remember(options, context) {
+            options.associateWith { it.displayName(context) }
+        }
+        val filteredOptions = remember(searchQuery, options, localizedOptions) {
             if (searchQuery.isBlank()) options
-            else options.filter { it.displayName.contains(searchQuery, ignoreCase = true) }
+            else options.filter { localizedOptions[it].orEmpty().contains(searchQuery, ignoreCase = true) }
         }
 
         val (downloaded, others) = remember(filteredOptions, downloadedCodes) {
@@ -86,26 +91,26 @@ fun LanguagePickerScreen(
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 if (downloaded.isNotEmpty()) {
-                    item { SectionHeaderTitle("Downloaded Packs") }
+                    item { SectionHeaderTitle(stringResource(R.string.downloaded_packs)) }
                     items(downloaded) { lang ->
                         LanguageItem(
                             lang = lang,
                             selected = selected,
                             enabled = lang.code != blockedCode,
-                            supportingText = "Ready to use",
+                            supportingText = stringResource(R.string.ready_to_use),
                             onSelect = onSelect
                         )
                     }
                 }
 
                 if (others.isNotEmpty()) {
-                    item { SectionHeaderTitle("Other Languages") }
+                    item { SectionHeaderTitle(stringResource(R.string.other_languages)) }
                     items(others) { lang ->
                         LanguageItem(
                             lang = lang,
                             selected = selected,
                             enabled = false,
-                            supportingText = "Download from Language Packs first",
+                            supportingText = stringResource(R.string.download_from_language_packs_first),
                             onSelect = onSelect
                         )
                     }
