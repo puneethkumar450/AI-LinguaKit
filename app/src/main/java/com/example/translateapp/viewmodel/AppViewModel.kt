@@ -89,7 +89,7 @@ private const val PREF_FREE_WORDS_USED = "free_words_used"
 private const val PREF_TRANSLATE_ACTIONS = "translate_actions"
 private const val PREF_COUNTED_TRANSLATION_KEYS = "counted_translation_keys"
 private const val PREF_FREE_LANGUAGE_CODES = "free_language_codes"
-private const val FREE_WORD_LIMIT = 1_000
+private const val FREE_WORD_LIMIT = 3_000
 private const val FREE_LANGUAGE_LIMIT = 3
 private const val AD_FREQUENCY = 5
 private val DEFAULT_FREE_LANGUAGE = SUPPORTED_LANGUAGES.first { it.code == "en" }
