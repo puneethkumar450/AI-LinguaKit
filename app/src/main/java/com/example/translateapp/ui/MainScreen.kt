@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.collectLatest
 fun MainScreen(vm: AppViewModel = hiltViewModel()) {
     val isFirstRun by vm.isFirstRun.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
+    val sourceLang by vm.translateSourceLang.collectAsState()
+    val targetLang by vm.translateTargetLang.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
 
@@ -106,10 +108,10 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                 composable("source_picker") {
                     LanguagePickerScreen(
                         titleRes = R.string.translate_from,
-                        selected = vm.translateSourceLang.collectAsState().value,
+                        selected = sourceLang,
                         options = vm.getSelectableSourceLanguages(),
                         downloadedCodes = downloadedCodes,
-                        blockedCode = vm.translateTargetLang.collectAsState().value.code,
+                        blockedCode = targetLang.code,
                         onSelect = {
                             vm.setTranslateSourceLang(it)
                             navController.popBackStack()
@@ -120,10 +122,10 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                 composable("target_picker") {
                     LanguagePickerScreen(
                         titleRes = R.string.translate_to,
-                        selected = vm.translateTargetLang.collectAsState().value,
+                        selected = targetLang,
                         options = vm.getSelectableTargetLanguages(),
                         downloadedCodes = downloadedCodes,
-                        blockedCode = vm.translateSourceLang.collectAsState().value.code,
+                        blockedCode = sourceLang.code,
                         onSelect = {
                             vm.setTranslateTargetLang(it)
                             navController.popBackStack()

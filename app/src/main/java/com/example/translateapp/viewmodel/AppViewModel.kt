@@ -681,7 +681,7 @@ class AppViewModel @Inject constructor(
         return if (isPremium.value) {
             lang
         } else {
-            _freePlanLanguages.value.find { it.code == lang.code } ?: DEFAULT_FREE_LANGUAGE
+            currentAllowedFreeLanguages().find { it.code == lang.code } ?: DEFAULT_FREE_LANGUAGE
         }
     }
 
@@ -689,10 +689,19 @@ class AppViewModel @Inject constructor(
         return if (isPremium.value) {
             lang
         } else {
-            _freePlanLanguages.value.find { it.code == lang.code }
-                ?: _freePlanLanguages.value.firstOrNull { it.code != translateSourceLang.value.code }
+            currentAllowedFreeLanguages().find { it.code == lang.code }
+                ?: currentAllowedFreeLanguages().firstOrNull { it.code != translateSourceLang.value.code }
                 ?: DEFAULT_FREE_LANGUAGE
         }
+    }
+
+    private fun currentAllowedFreeLanguages(): List<LanguageOption> {
+        val downloaded = allPacks.value
+            .filter { it.status == PackStatus.DOWNLOADED }
+            .mapNotNull { pack -> SUPPORTED_LANGUAGES.find { it.mlKitCode == pack.mlKitCode } }
+            .distinctBy { it.code }
+            .take(FREE_LANGUAGE_LIMIT)
+        return downloaded.ifEmpty { _freePlanLanguages.value }
     }
 
     private fun appString(@StringRes resId: Int, vararg args: Any): String {
