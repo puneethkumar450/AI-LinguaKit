@@ -6,6 +6,10 @@ import com.example.translateapp.data.LanguagePackDao
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
 import com.example.translateapp.viewmodel.SUPPORTED_LANGUAGES
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -26,12 +30,17 @@ private const val TAG = "LangPackRepo"
  *  - Expose reactive [Flow]s for the UI
  *  - Provide download / delete operations that update both ML Kit and Room
  */
-class LanguagePackRepository(
-    private val context: Context,
+class LanguagePackRepository @AssistedInject constructor(
+    @ApplicationContext private val context: Context,
     private val dao: LanguagePackDao,
     private val downloader: ModelDownloadManager,
-    private val scope: CoroutineScope
+    @Assisted private val scope: CoroutineScope
 ) {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(scope: CoroutineScope): LanguagePackRepository
+    }
 
     // ── Public flows ───────────────────────────────────────────────────────────
 
