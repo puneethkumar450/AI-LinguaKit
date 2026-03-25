@@ -1,5 +1,15 @@
 <resources>
     <string name="app_name">AI-LinguaKit</string>
+    <string name="splash_tagline">Speak. Translate. Connect</string>
+    <string name="splash_caption">Offline language tools with AI-native clarity</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_welcome_title">Welcome to AI-LinguaKit</string>
+    <string name="onboarding_welcome_body">Break language barriers with instant AI-assisted translation designed for everyday conversations.</string>
+    <string name="onboarding_languages_title">Choose your languages</string>
+    <string name="onboarding_languages_body">Pick your preferred languages and move between them with a fast, friendly translation workflow.</string>
+    <string name="onboarding_features_title">Discover advanced features</string>
+    <string name="onboarding_features_body">Use voice input, offline packs, and smart language tools to communicate with more confidence anywhere.</string>
     <string name="back">Back</string>
     <string name="confirm">Confirm</string>
     <string name="continue_label">Continue</string>

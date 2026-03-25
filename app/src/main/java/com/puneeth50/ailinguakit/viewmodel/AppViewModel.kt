@@ -89,6 +89,7 @@ private const val PREF_FREE_WORDS_USED = "free_words_used"
 private const val PREF_TRANSLATE_ACTIONS = "translate_actions"
 private const val PREF_COUNTED_TRANSLATION_KEYS = "counted_translation_keys"
 private const val PREF_FREE_LANGUAGE_CODES = "free_language_codes"
+private const val PREF_FREE_LANGUAGE_CODES_ORDERED = "free_language_codes_ordered"
 private const val FREE_WORD_LIMIT = 3_000
 private const val FREE_LANGUAGE_LIMIT = 3
 private const val AD_FREQUENCY = 5
@@ -238,13 +239,12 @@ class AppViewModel @Inject constructor(
         persistFreeLanguages(selected)
         prefs.edit {
             putBoolean(PREF_IS_FIRST_RUN, false)
-                .putString(PREF_SOURCE_LANG_CODE, DEFAULT_FREE_LANGUAGE.code)
-                .putString(PREF_TARGET_LANG_CODE, source.code)
+                .putString(PREF_SOURCE_LANG_CODE, source.code)
+                .putString(PREF_TARGET_LANG_CODE, target.code)
         }
 
         _isFirstRun.value = false
-        translationController.setTranslateSourceLang(DEFAULT_FREE_LANGUAGE)
-        translationController.setTranslateTargetLang(source)
+        translationController.setTranslateLanguages(source, target)
 
         viewModelScope.launch {
             _uiMessage.emit(appString(R.string.downloading_selected_language_packs))
@@ -253,7 +253,6 @@ class AppViewModel @Inject constructor(
                     runCatching { packRepo.downloadPack(lang.mlKitCode, requireWifi = false) }
                 }
             }
-            downloader.warmUp(source.mlKitCode, target.mlKitCode)
             reconcileFreeLanguagesWithCurrentState()
         }
     }
@@ -628,8 +627,10 @@ class AppViewModel @Inject constructor(
 
     private fun persistFreeLanguages(languages: List<LanguageOption>) {
         val codes = languages.distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT).map { it.code }
-            .toSet()
-        prefs.edit { putStringSet(PREF_FREE_LANGUAGE_CODES, codes)}
+        prefs.edit {
+            putStringSet(PREF_FREE_LANGUAGE_CODES, codes.toSet())
+            putString(PREF_FREE_LANGUAGE_CODES_ORDERED, codes.joinToString(","))
+        }
         _freePlanLanguages.value = codes.mapNotNull { code ->
             SUPPORTED_LANGUAGES.find { it.code == code }
         }.ifEmpty {
@@ -638,7 +639,16 @@ class AppViewModel @Inject constructor(
     }
 
     private fun loadPersistedFreeLanguages(): List<LanguageOption> {
-        val codes = prefs.getStringSet(PREF_FREE_LANGUAGE_CODES, emptySet()).orEmpty().toList()
+        val orderedCodes = prefs.getString(PREF_FREE_LANGUAGE_CODES_ORDERED, null)
+            ?.split(",")
+            ?.map(String::trim)
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        val codes = if (orderedCodes.isNotEmpty()) {
+            orderedCodes
+        } else {
+            prefs.getStringSet(PREF_FREE_LANGUAGE_CODES, emptySet()).orEmpty().toList()
+        }
         return codes.mapNotNull { code -> SUPPORTED_LANGUAGES.find { it.code == code } }
     }
 

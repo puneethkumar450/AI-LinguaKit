@@ -111,6 +111,35 @@ class TranslationController(
         }
     }
 
+    fun setTranslateLanguages(source: LanguageOption, target: LanguageOption) {
+        val safeSource = sanitizeSource(source)
+        val safeTarget = sanitizeTarget(target)
+        if (safeSource.code == safeTarget.code) return
+
+        _translateSourceLang.value = safeSource
+        _translateTargetLang.value = safeTarget
+        _translatedText.value = ""
+        _translateSource.value = TranslateSource.NONE
+        _translateError.value = null
+        _detectedLanguage.value = null
+
+        prefs.edit {
+            putString(PREF_SOURCE_LANG_CODE, safeSource.code)
+            putString(PREF_TARGET_LANG_CODE, safeTarget.code)
+        }
+
+        scope.launch {
+            val srcCode = if (safeSource == AUTO_DETECT_OPTION) {
+                com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH
+            } else {
+                safeSource.mlKitCode
+            }
+            if (canWarmUp(srcCode, safeTarget.mlKitCode)) {
+                downloader.warmUp(srcCode, safeTarget.mlKitCode)
+            }
+        }
+    }
+
     fun swapTranslateLanguages() {
         val src = _translateSourceLang.value
         val tgt = _translateTargetLang.value
@@ -154,8 +183,10 @@ class TranslationController(
     }
 
     fun restoreFromHistory(entry: TranslationHistoryEntity, fallbackSource: LanguageOption, fallbackTarget: LanguageOption) {
-        setTranslateSourceLang(SUPPORTED_LANGUAGES.find { it.code == entry.sourceLangCode } ?: fallbackSource)
-        setTranslateTargetLang(SUPPORTED_LANGUAGES.find { it.code == entry.targetLangCode } ?: fallbackTarget)
+        setTranslateLanguages(
+            SUPPORTED_LANGUAGES.find { it.code == entry.sourceLangCode } ?: fallbackSource,
+            SUPPORTED_LANGUAGES.find { it.code == entry.targetLangCode } ?: fallbackTarget
+        )
         _translateInput.value = entry.sourceText
         _translatedText.value = entry.translatedText
         _translateSource.value = TranslateSource.HISTORY

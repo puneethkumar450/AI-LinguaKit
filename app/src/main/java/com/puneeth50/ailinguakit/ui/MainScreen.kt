@@ -7,7 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,6 +28,7 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
     val targetLang by vm.translateTargetLang.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
+    var showOnboarding by rememberSaveable(isFirstRun) { mutableStateOf(false) }
 
     val downloadedCodes = remember(allPacks) {
         allPacks.filter { it.status == PackStatus.DOWNLOADED }
@@ -48,11 +52,17 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         if (isFirstRun) {
-            OneTimeLanguagePicker(
-                onLanguagesSelected = { source, target ->
-                    vm.completeFirstRun(source, target)
-                }
-            )
+            if (showOnboarding) {
+                OnboardingFlow(
+                    onFinished = { showOnboarding = false }
+                )
+            } else {
+                OneTimeLanguagePicker(
+                    onLanguagesSelected = { source, target ->
+                        vm.completeFirstRun(source, target)
+                    }
+                )
+            }
         } else {
             NavHost(
                 navController = navController,
