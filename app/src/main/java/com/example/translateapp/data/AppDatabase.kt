@@ -23,7 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile private var INSTANCE: AppDatabase? = null
 
         /** Adds the language_packs table introduced in v2. */
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """

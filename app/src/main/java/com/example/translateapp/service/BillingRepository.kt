@@ -15,9 +15,12 @@ import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.example.translateapp.R
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private const val PREF_PREMIUM_CACHED = "premium_cached"
 private const val PREMIUM_INAPP_ID = "linguakit_premium"
@@ -29,8 +32,9 @@ data class PremiumProduct(
     val formattedPrice: String
 )
 
-class BillingRepository(
-    context: Context,
+@Singleton
+class BillingRepository @Inject constructor(
+    @ApplicationContext context: Context,
     private val prefs: SharedPreferences
 ) {
     private val appContext = context.applicationContext

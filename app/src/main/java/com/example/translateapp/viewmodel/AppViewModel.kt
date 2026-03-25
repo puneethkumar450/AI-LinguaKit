@@ -3,6 +3,7 @@ package com.example.translateapp.viewmodel
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.annotation.StringRes
@@ -10,9 +11,10 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.translateapp.R
-import com.example.translateapp.data.AppDatabase
+import com.example.translateapp.data.LanguagePackDao
 import com.example.translateapp.data.LanguagePackEntity
 import com.example.translateapp.data.PackStatus
+import com.example.translateapp.data.TranslationHistoryDao
 import com.example.translateapp.data.TranslationHistoryEntity
 import com.example.translateapp.service.AppLanguageOption
 import com.example.translateapp.service.AppSettingsManager
@@ -30,6 +32,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +45,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
+import javax.inject.Inject
 import kotlin.coroutines.resume
 
 data class LanguageOption(
@@ -90,16 +94,17 @@ private const val FREE_LANGUAGE_LIMIT = 3
 private const val AD_FREQUENCY = 3
 private val DEFAULT_FREE_LANGUAGE = SUPPORTED_LANGUAGES.first { it.code == "en" }
 
-class AppViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class AppViewModel @Inject constructor(
+    application: Application,
+    private val prefs: SharedPreferences,
+    private val historyDao: TranslationHistoryDao,
+    private val packDao: LanguagePackDao,
+    private val downloader: ModelDownloadManager,
+    private val billingRepo: BillingRepository
+) : AndroidViewModel(application) {
 
-    private val prefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-
-    private val db = AppDatabase.getInstance(application)
-    private val historyDao = db.historyDao()
-    private val packDao = db.languagePackDao()
-    private val downloader = ModelDownloadManager()
     val packRepo = LanguagePackRepository(application, packDao, downloader, viewModelScope)
-    private val billingRepo = BillingRepository(application, prefs)
 
     private val _isFirstRun = MutableStateFlow(prefs.getBoolean(PREF_IS_FIRST_RUN, true))
     val isFirstRun: StateFlow<Boolean> = _isFirstRun.asStateFlow()

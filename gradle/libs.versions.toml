@@ -15,6 +15,8 @@ accompanist = "0.34.0"
 room = "2.6.1"
 ksp = "2.0.0-1.0.22"
 material = "1.12.0"
+hilt = "2.52"
+hiltNavigationCompose = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +32,9 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 # ML Kit
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
@@ -58,3 +63,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

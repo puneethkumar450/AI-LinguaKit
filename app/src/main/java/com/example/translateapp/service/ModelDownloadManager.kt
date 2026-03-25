@@ -10,12 +10,15 @@ import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 private const val TAG = "ModelDownloadManager"
 
-class ModelDownloadManager {
+@Singleton
+class ModelDownloadManager @Inject constructor() {
 
     private val remoteModelManager = RemoteModelManager.getInstance()
     private val translatorCache = ConcurrentHashMap<String, Translator>()

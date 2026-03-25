@@ -8,7 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -18,7 +18,7 @@ import com.example.translateapp.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
-fun MainScreen(vm: AppViewModel = viewModel()) {
+fun MainScreen(vm: AppViewModel = hiltViewModel()) {
     val isFirstRun by vm.isFirstRun.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }

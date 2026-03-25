@@ -1,6 +1,5 @@
 package com.example.translateapp.ui
 
-import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -440,8 +439,8 @@ private fun HistoryCard(
 
 @Composable
 @Preview(showBackground = true)
-fun HistoryScreenPreview(){
-    HistoryScreen(AppViewModel(Application()), {}, {})
+fun HistoryScreenPreview() {
+    Text("History screen preview is available through individual card previews.")
 }
 
 @Preview(showBackground = true)
