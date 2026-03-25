@@ -1,8 +1,5 @@
 package com.example.translateapp.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -11,28 +8,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.translateapp.R
 import com.example.translateapp.data.PackStatus
-import com.example.translateapp.viewmodel.AdViewModel
 import com.example.translateapp.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun MainScreen(vm: AppViewModel = viewModel()) {
-    val context = LocalContext.current
-    val adVm: AdViewModel = viewModel()
     val isFirstRun by vm.isFirstRun.collectAsState()
-    val isPremium by vm.isPremium.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
-    val adUiState by adVm.adUiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
-    val activity = remember(context) { context.findActivity() }
 
     val downloadedCodes = remember(allPacks) {
         allPacks.filter { it.status == PackStatus.DOWNLOADED }
@@ -48,15 +38,7 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
 
     LaunchedEffect(Unit) {
         vm.showInterstitialAd.collectLatest {
-            activity?.let { safeActivity ->
-                adVm.showInterstitialIfAvailable(safeActivity)
-            }
-        }
-    }
-
-    LaunchedEffect(adUiState.isInterstitialReady, adUiState.isRewardedReady) {
-        if (!adUiState.isInterstitialReady || !adUiState.isRewardedReady) {
-            adVm.preloadAds()
+            navController.navigate("advertisement")
         }
     }
 
@@ -151,13 +133,5 @@ fun MainScreen(vm: AppViewModel = viewModel()) {
                 }
             }
         }
-    }
-}
-
-private tailrec fun Context.findActivity(): Activity? {
-    return when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
     }
 }
