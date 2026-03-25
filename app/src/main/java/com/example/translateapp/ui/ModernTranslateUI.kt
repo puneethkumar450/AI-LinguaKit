@@ -27,12 +27,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Badge
@@ -42,6 +44,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -88,6 +92,7 @@ fun ModernTranslateScreen(
     onNavigateToTargetPicker: () -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val input by vm.translateInput.collectAsState()
     val translatedText by vm.translatedText.collectAsState()
     val sourceLang by vm.translateSourceLang.collectAsState()
@@ -158,6 +163,11 @@ fun ModernTranslateScreen(
         onSpeak = { vm.speakText(translatedText, targetLang.code) },
         onStopSpeaking = vm::stopSpeaking,
         onClearInput = vm::clearTranslation,
+        onPasteAndTranslate = { pastedText ->
+            vm.onTranslateInputChange(pastedText)
+            vm.translateFromPrimaryAction()
+        },
+        clipboardText = clipboardManager.getText()?.text.orEmpty(),
         canChangeLanguages = true,
         showBannerAd = !isPremium
     )
@@ -187,6 +197,8 @@ private fun MainTranslateView(
     onSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
     onClearInput: () -> Unit,
+    onPasteAndTranslate: (String) -> Unit,
+    clipboardText: String,
     canChangeLanguages: Boolean,
     showBannerAd: Boolean
 ) {
@@ -207,6 +219,8 @@ private fun MainTranslateView(
         else -> estimatedVisualLines
     }
     val isKeyboardVisible = WindowInsets.isImeVisible
+    val normalizedClipboardText = clipboardText.trim()
+    val canPasteAndTranslate = normalizedClipboardText.isNotEmpty() && normalizedClipboardText != input.trim()
 
     Scaffold(
         topBar = {
@@ -251,6 +265,20 @@ private fun MainTranslateView(
                     onTargetLangClick = onTargetLangClick,
                     onLanguageSwap = onLanguageSwap
                 )
+            }
+        },
+        floatingActionButton = {
+            if (canPasteAndTranslate && isKeyboardVisible) {
+                FloatingActionButton(
+                    onClick = { onPasteAndTranslate(normalizedClipboardText) },
+                    containerColor = colorScheme.primary,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        Icons.Default.ContentPaste,
+                        contentDescription = stringResource(R.string.paste_and_translate)
+                    )
+                }
             }
         }
     ) { padding ->
@@ -345,6 +373,21 @@ private fun MainTranslateView(
                 }
             }
 
+            if (canPasteAndTranslate && !isKeyboardVisible) {
+                FloatingActionButton(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(bottom = 21.dp, start = 24.dp, end = 24.dp),
+                    onClick = { onPasteAndTranslate(normalizedClipboardText) },
+                    containerColor = colorScheme.primary,
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        Icons.Rounded.ContentPaste,
+                        contentDescription = stringResource(R.string.paste_and_translate)
+                    )
+                }
+            }
             if (!isKeyboardVisible) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
