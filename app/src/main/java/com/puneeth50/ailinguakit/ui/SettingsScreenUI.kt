@@ -42,7 +42,8 @@ fun SettingsScreenUI(
     vm: AppViewModel,
     onBack: () -> Unit,
     onOpenLanguageChange: () -> Unit,
-    onOpenLanguagePacks: () -> Unit
+    onOpenLanguagePacks: () -> Unit,
+    onOpenRewards: () -> Unit
 ) {
     val themeMode by vm.themeMode.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
@@ -114,6 +115,13 @@ fun SettingsScreenUI(
                     title = stringResource(R.string.language_packs_title),
                     subtitle = stringResource(R.string.language_packs_subtitle),
                     onClick = onOpenLanguagePacks
+                )
+            }
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.rewards_title),
+                    subtitle = stringResource(R.string.rewards_settings_subtitle),
+                    onClick = onOpenRewards
                 )
             }
             item {

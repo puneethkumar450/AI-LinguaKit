@@ -101,7 +101,14 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                         vm = vm,
                         onBack = { navController.popBackStack() },
                         onOpenLanguageChange = { navController.navigate("language_change") },
-                        onOpenLanguagePacks = { navController.navigate("packs") }
+                        onOpenLanguagePacks = { navController.navigate("packs") },
+                        onOpenRewards = { navController.navigate("rewards") }
+                    )
+                }
+                composable("rewards") {
+                    RewardsScreenUI(
+                        onBack = { navController.popBackStack() },
+                        onOpenPlanSelection = { navController.navigate("plan_selection") }
                     )
                 }
                 composable("language_change") {
