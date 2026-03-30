@@ -30,6 +30,8 @@ import com.puneeth50.ailinguakit.service.BillingRepository
 import com.puneeth50.ailinguakit.service.LanguagePackController
 import com.puneeth50.ailinguakit.service.LanguagePackRepository
 import com.puneeth50.ailinguakit.service.ModelDownloadManager
+import com.puneeth50.ailinguakit.service.PremiumPlanOption
+import com.puneeth50.ailinguakit.service.PremiumPlanType
 import com.puneeth50.ailinguakit.service.RewardType
 import com.puneeth50.ailinguakit.service.RewardsRepository
 import com.puneeth50.ailinguakit.service.SpeechController
@@ -115,7 +117,8 @@ class AppViewModel @Inject constructor(
     val isFirstRun: StateFlow<Boolean> = _isFirstRun.asStateFlow()
 
     val isPremium: StateFlow<Boolean> = billingRepo.isPremium
-    val premiumProduct = billingRepo.premiumProduct
+    val availablePremiumPlans: StateFlow<List<PremiumPlanOption>> = billingRepo.availablePremiumPlans
+    val activePremiumPlanType: StateFlow<PremiumPlanType?> = billingRepo.activePremiumPlanType
     val billingReady = billingRepo.billingReady
     private val _themeMode = MutableStateFlow(AppSettingsManager.getSavedThemeMode(application))
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
@@ -297,8 +300,8 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun launchPremiumPurchase(activity: Activity): Boolean {
-        return billingRepo.launchPurchase(activity)
+    fun launchPremiumPurchase(activity: Activity, planType: PremiumPlanType): Boolean {
+        return billingRepo.launchPurchase(activity, planType)
     }
 
     fun refreshPremiumState() {

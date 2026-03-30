@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.annotation.StringRes
+import androidx.core.content.edit
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -23,13 +24,23 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val PREF_PREMIUM_CACHED = "premium_cached"
+private const val PREF_PREMIUM_PLAN_TYPE = "premium_plan_type"
 private const val PREMIUM_INAPP_ID = "linguakit_premium"
 private const val PREMIUM_SUBS_ID = "linguakit_premium_sub"
 
-data class PremiumProduct(
+enum class PremiumPlanType {
+    MONTHLY,
+    YEARLY,
+    LIFETIME
+}
+
+data class PremiumPlanOption(
+    val type: PremiumPlanType,
     val productDetails: ProductDetails,
     val productType: String,
-    val formattedPrice: String
+    val formattedPrice: String,
+    val offerToken: String? = null,
+    val billingPeriod: String? = null
 )
 
 @Singleton
@@ -41,8 +52,11 @@ class BillingRepository @Inject constructor(
     private val _isPremium = MutableStateFlow(prefs.getBoolean(PREF_PREMIUM_CACHED, false))
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
 
-    private val _premiumProduct = MutableStateFlow<PremiumProduct?>(null)
-    val premiumProduct: StateFlow<PremiumProduct?> = _premiumProduct.asStateFlow()
+    private val _availablePremiumPlans = MutableStateFlow<List<PremiumPlanOption>>(emptyList())
+    val availablePremiumPlans: StateFlow<List<PremiumPlanOption>> = _availablePremiumPlans.asStateFlow()
+
+    private val _activePremiumPlanType = MutableStateFlow(loadCachedPlanType())
+    val activePremiumPlanType: StateFlow<PremiumPlanType?> = _activePremiumPlanType.asStateFlow()
 
     private val _billingReady = MutableStateFlow(false)
     val billingReady: StateFlow<Boolean> = _billingReady.asStateFlow()
@@ -50,15 +64,19 @@ class BillingRepository @Inject constructor(
     private val _billingMessage = MutableStateFlow<String?>(null)
     val billingMessage: StateFlow<String?> = _billingMessage.asStateFlow()
 
+    private var pendingPlanType: PremiumPlanType? = null
+
     private val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
         when {
             billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null -> {
                 purchases.forEach(::handlePurchase)
             }
             billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> {
+                pendingPlanType = null
                 _billingMessage.value = string(R.string.purchase_canceled)
             }
             billingResult.responseCode != BillingClient.BillingResponseCode.OK -> {
+                pendingPlanType = null
                 _billingMessage.value = billingResult.debugMessage.ifBlank { string(R.string.purchase_failed) }
             }
         }
@@ -77,7 +95,7 @@ class BillingRepository @Inject constructor(
         if (billingClient.isReady) {
             _billingReady.value = true
             refreshPurchases()
-            queryPremiumProduct()
+            queryPremiumPlans()
             return
         }
 
@@ -86,7 +104,7 @@ class BillingRepository @Inject constructor(
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                     _billingReady.value = true
                     refreshPurchases()
-                    queryPremiumProduct()
+                    queryPremiumPlans()
                 } else {
                     _billingReady.value = false
                     _billingMessage.value = billingResult.debugMessage.ifBlank { string(R.string.billing_unavailable) }
@@ -105,15 +123,26 @@ class BillingRepository @Inject constructor(
             return
         }
 
-        queryPurchases(BillingClient.ProductType.INAPP) { hasInApp ->
-            queryPurchases(BillingClient.ProductType.SUBS) { hasSubs ->
-                persistPremiumState(hasInApp || hasSubs)
+        queryPurchases(BillingClient.ProductType.INAPP) { inAppPurchase, inAppSuccess ->
+            queryPurchases(BillingClient.ProductType.SUBS) { subPurchase, subSuccess ->
+                if (!inAppSuccess || !subSuccess) {
+                    if (!_isPremium.value) {
+                        persistPremiumState(false, null)
+                    }
+                    return@queryPurchases
+                }
+
+                when {
+                    inAppPurchase != null -> persistPremiumState(true, PremiumPlanType.LIFETIME)
+                    subPurchase != null -> persistPremiumState(true, resolveActiveSubscriptionPlanType())
+                    else -> persistPremiumState(false, null)
+                }
             }
         }
     }
 
-    fun launchPurchase(activity: Activity): Boolean {
-        val product = _premiumProduct.value ?: run {
+    fun launchPurchase(activity: Activity, planType: PremiumPlanType): Boolean {
+        val plan = _availablePremiumPlans.value.firstOrNull { it.type == planType } ?: run {
             _billingMessage.value = string(R.string.premium_purchase_not_available)
             return false
         }
@@ -124,13 +153,10 @@ class BillingRepository @Inject constructor(
         }
 
         val productParamsBuilder = BillingFlowParams.ProductDetailsParams.newBuilder()
-            .setProductDetails(product.productDetails)
+            .setProductDetails(plan.productDetails)
 
-        if (product.productType == BillingClient.ProductType.SUBS) {
-            val offerToken = product.productDetails.subscriptionOfferDetails
-                ?.firstOrNull()
-                ?.offerToken
-                ?: return false
+        if (plan.productType == BillingClient.ProductType.SUBS) {
+            val offerToken = plan.offerToken ?: return false
             productParamsBuilder.setOfferToken(offerToken)
         }
 
@@ -138,34 +164,37 @@ class BillingRepository @Inject constructor(
             .setProductDetailsParamsList(listOf(productParamsBuilder.build()))
             .build()
 
+        pendingPlanType = plan.type
         billingClient.launchBillingFlow(activity, flowParams)
         return true
+    }
+
+    fun launchPurchase(activity: Activity): Boolean {
+        val preferredPlan = _availablePremiumPlans.value
+            .sortedBy { it.type.sortOrder() }
+            .firstOrNull()
+            ?: return false
+        return launchPurchase(activity, preferredPlan.type)
     }
 
     fun clearBillingMessage() {
         _billingMessage.value = null
     }
 
-    private fun queryPremiumProduct() {
-        queryProductType(
-            productId = PREMIUM_SUBS_ID,
-            productType = BillingClient.ProductType.SUBS
-        )
-        queryProductType(
-            productId = PREMIUM_INAPP_ID,
-            productType = BillingClient.ProductType.INAPP
-        )
+    private fun queryPremiumPlans() {
+        querySubscriptionPlans()
+        queryLifetimePlan()
     }
 
-    private fun queryProductType(productId: String, productType: String) {
+    private fun querySubscriptionPlans() {
         if (!billingClient.isReady) return
 
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(
                 listOf(
                     QueryProductDetailsParams.Product.newBuilder()
-                        .setProductId(productId)
-                        .setProductType(productType)
+                        .setProductId(PREMIUM_SUBS_ID)
+                        .setProductType(BillingClient.ProductType.SUBS)
                         .build()
                 )
             )
@@ -174,23 +203,61 @@ class BillingRepository @Inject constructor(
         billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
             if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
             val details = productDetailsList.firstOrNull() ?: return@queryProductDetailsAsync
-            val price = when (productType) {
-                BillingClient.ProductType.SUBS -> details.subscriptionOfferDetails
-                    ?.firstOrNull()
-                    ?.pricingPhases
-                    ?.pricingPhaseList
-                    ?.firstOrNull()
-                    ?.formattedPrice
-                else -> details.oneTimePurchaseOfferDetails?.formattedPrice
-            } ?: string(R.string.see_play_store)
+            val plans = details.subscriptionOfferDetails.orEmpty()
+                .mapNotNull { offer ->
+                    val phase = offer.pricingPhases.pricingPhaseList.lastOrNull() ?: return@mapNotNull null
+                    val type = when (phase.billingPeriod) {
+                        "P1M" -> PremiumPlanType.MONTHLY
+                        "P1Y" -> PremiumPlanType.YEARLY
+                        else -> null
+                    } ?: return@mapNotNull null
 
-            if (_premiumProduct.value == null || productType == BillingClient.ProductType.SUBS) {
-                _premiumProduct.value = PremiumProduct(details, productType, price)
-            }
+                    PremiumPlanOption(
+                        type = type,
+                        productDetails = details,
+                        productType = BillingClient.ProductType.SUBS,
+                        formattedPrice = phase.formattedPrice,
+                        offerToken = offer.offerToken,
+                        billingPeriod = phase.billingPeriod
+                    )
+                }
+                .distinctBy { it.type }
+                .sortedBy { it.type.sortOrder() }
+
+            setSubscriptionPlans(plans)
         }
     }
 
-    private fun queryPurchases(productType: String, onResult: (Boolean) -> Unit) {
+    private fun queryLifetimePlan() {
+        if (!billingClient.isReady) return
+
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(
+                listOf(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId(PREMIUM_INAPP_ID)
+                        .setProductType(BillingClient.ProductType.INAPP)
+                        .build()
+                )
+            )
+            .build()
+
+        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
+            val details = productDetailsList.firstOrNull() ?: return@queryProductDetailsAsync
+            val price = details.oneTimePurchaseOfferDetails?.formattedPrice ?: string(R.string.see_play_store)
+            setLifetimePlan(
+                PremiumPlanOption(
+                    type = PremiumPlanType.LIFETIME,
+                    productDetails = details,
+                    productType = BillingClient.ProductType.INAPP,
+                    formattedPrice = price
+                )
+            )
+        }
+    }
+
+    private fun queryPurchases(productType: String, onResult: (Purchase?, Boolean) -> Unit) {
         if (!billingClient.isReady) return
 
         val params = QueryPurchasesParams.newBuilder()
@@ -199,9 +266,9 @@ class BillingRepository @Inject constructor(
 
         billingClient.queryPurchasesAsync(params) { billingResult, purchases ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                onResult(purchases.any(::isPremiumPurchase))
+                onResult(purchases.firstOrNull(::isPremiumPurchase), true)
             } else {
-                onResult(_isPremium.value)
+                onResult(null, false)
             }
         }
     }
@@ -210,7 +277,16 @@ class BillingRepository @Inject constructor(
         if (!isPremiumPurchase(purchase)) return
 
         if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            persistPremiumState(true)
+            val activePlanType = when {
+                purchase.products.any { it == PREMIUM_INAPP_ID } -> PremiumPlanType.LIFETIME
+                purchase.products.any { it == PREMIUM_SUBS_ID } ->
+                    pendingPlanType?.takeIf { it != PremiumPlanType.LIFETIME }
+                        ?: resolveActiveSubscriptionPlanType()
+                else -> null
+            }
+
+            persistPremiumState(true, activePlanType)
+            pendingPlanType = null
 
             if (!purchase.isAcknowledged) {
                 val params = AcknowledgePurchaseParams.newBuilder()
@@ -233,13 +309,56 @@ class BillingRepository @Inject constructor(
             purchase.purchaseState == Purchase.PurchaseState.PURCHASED
     }
 
-    private fun persistPremiumState(isPremium: Boolean) {
+    private fun persistPremiumState(isPremium: Boolean, activePlanType: PremiumPlanType?) {
         prefs.edit().putBoolean(PREF_PREMIUM_CACHED, isPremium).apply()
+        prefs.edit {
+            if (isPremium && activePlanType != null) {
+                putString(PREF_PREMIUM_PLAN_TYPE, activePlanType.name)
+            } else if (!isPremium) {
+                remove(PREF_PREMIUM_PLAN_TYPE)
+            }
+        }
         _isPremium.value = isPremium
+        if (isPremium) {
+            _activePremiumPlanType.value = activePlanType
+        } else {
+            _activePremiumPlanType.value = null
+        }
     }
 
     fun endConnection() {
         billingClient.endConnection()
+    }
+
+    private fun setSubscriptionPlans(plans: List<PremiumPlanOption>) {
+        val nonSubscriptionPlans = _availablePremiumPlans.value.filter { it.productType != BillingClient.ProductType.SUBS }
+        _availablePremiumPlans.value = (nonSubscriptionPlans + plans).sortedBy { it.type.sortOrder() }
+    }
+
+    private fun setLifetimePlan(plan: PremiumPlanOption) {
+        val withoutLifetime = _availablePremiumPlans.value.filter { it.type != PremiumPlanType.LIFETIME }
+        _availablePremiumPlans.value = (withoutLifetime + plan).sortedBy { it.type.sortOrder() }
+    }
+
+    private fun resolveActiveSubscriptionPlanType(): PremiumPlanType? {
+        val cached = _activePremiumPlanType.value
+        if (cached == PremiumPlanType.MONTHLY || cached == PremiumPlanType.YEARLY) {
+            return cached
+        }
+
+        val subscriptionPlans = _availablePremiumPlans.value.filter { it.productType == BillingClient.ProductType.SUBS }
+        return if (subscriptionPlans.size == 1) subscriptionPlans.first().type else null
+    }
+
+    private fun loadCachedPlanType(): PremiumPlanType? {
+        return prefs.getString(PREF_PREMIUM_PLAN_TYPE, null)
+            ?.let { stored -> runCatching { PremiumPlanType.valueOf(stored) }.getOrNull() }
+    }
+
+    private fun PremiumPlanType.sortOrder(): Int = when (this) {
+        PremiumPlanType.YEARLY -> 0
+        PremiumPlanType.MONTHLY -> 1
+        PremiumPlanType.LIFETIME -> 2
     }
 
     private fun string(@StringRes resId: Int, vararg args: Any): String {

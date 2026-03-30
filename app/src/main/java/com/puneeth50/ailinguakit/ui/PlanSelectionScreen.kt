@@ -55,13 +55,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.puneeth50.ailinguakit.R
+import com.puneeth50.ailinguakit.service.PremiumPlanOption
+import com.puneeth50.ailinguakit.service.PremiumPlanType
 import com.puneeth50.ailinguakit.ui.theme.AccentGold
 import com.puneeth50.ailinguakit.ui.theme.BrandBlue
 import com.puneeth50.ailinguakit.viewmodel.AppViewModel
 
 private enum class SelectedPlan {
     FREE,
-    PREMIUM
+    MONTHLY,
+    YEARLY,
+    LIFETIME
 }
 
 @Composable
@@ -70,11 +74,28 @@ fun PlanSelectionScreen(
     onBack: () -> Unit
 ) {
     val isPremium by vm.isPremium.collectAsState()
-    val product by vm.premiumProduct.collectAsState()
+    val availablePlans by vm.availablePremiumPlans.collectAsState()
+    val activePlanType by vm.activePremiumPlanType.collectAsState()
     val billingReady by vm.billingReady.collectAsState()
     val context = LocalContext.current
-    var selectedPlan by rememberSaveable(isPremium) {
-        mutableStateOf(if (isPremium) SelectedPlan.PREMIUM else SelectedPlan.PREMIUM)
+
+    val yearlyPlan = availablePlans.firstOrNull { it.type == PremiumPlanType.YEARLY }
+    val monthlyPlan = availablePlans.firstOrNull { it.type == PremiumPlanType.MONTHLY }
+    val lifetimePlan = availablePlans.firstOrNull { it.type == PremiumPlanType.LIFETIME }
+
+    val availableKey = availablePlans.joinToString("|") { "${it.type.name}:${it.formattedPrice}" }
+    var selectedPlan by rememberSaveable(availableKey, isPremium, activePlanType?.name) {
+        mutableStateOf(defaultSelectedPlan(isPremium, activePlanType, yearlyPlan, monthlyPlan, lifetimePlan))
+    }
+
+    val selectedPremiumType = when (selectedPlan) {
+        SelectedPlan.YEARLY -> PremiumPlanType.YEARLY
+        SelectedPlan.MONTHLY -> PremiumPlanType.MONTHLY
+        SelectedPlan.LIFETIME -> PremiumPlanType.LIFETIME
+        SelectedPlan.FREE -> null
+    }
+    val selectedPremiumPlan = selectedPremiumType?.let { type ->
+        availablePlans.firstOrNull { it.type == type }
     }
 
     val backgroundTop = BrandBlue
@@ -221,16 +242,76 @@ fun PlanSelectionScreen(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 PlanOptionCard(
-                    title = stringResource(R.string.plan_premium_choice_title),
-                    subtitle = product?.formattedPrice ?: stringResource(R.string.plan_premium_pricing_fallback),
-                    trailing = stringResource(R.string.plan_premium_choice_trailing),
+                    title = stringResource(R.string.plan_yearly_choice_title),
+                    subtitle = yearlyPlan?.let {
+                        stringResource(R.string.plan_yearly_choice_subtitle_template, it.formattedPrice)
+                    } ?: stringResource(R.string.plan_unavailable),
+                    trailing = when {
+                        isPremium && activePlanType == PremiumPlanType.YEARLY -> stringResource(R.string.plan_active_label)
+                        else -> stringResource(R.string.plan_yearly_choice_trailing)
+                    },
                     badge = stringResource(R.string.plan_most_popular),
-                    selected = selectedPlan == SelectedPlan.PREMIUM || isPremium,
+                    selected = (isPremium && activePlanType == PremiumPlanType.YEARLY) || (!isPremium && selectedPlan == SelectedPlan.YEARLY),
+                    enabled = yearlyPlan != null && !isPremium,
                     containerColor = optionSurface,
-                    borderColor = if (selectedPlan == SelectedPlan.PREMIUM || isPremium) highlightBorder else optionBorder,
+                    borderColor = if ((isPremium && activePlanType == PremiumPlanType.YEARLY) || (!isPremium && selectedPlan == SelectedPlan.YEARLY)) {
+                        highlightBorder
+                    } else {
+                        optionBorder
+                    },
                     textColor = Color.White,
                     accentColor = AccentGold,
-                    onClick = { selectedPlan = SelectedPlan.PREMIUM }
+                    onClick = { selectedPlan = SelectedPlan.YEARLY }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PlanOptionCard(
+                    title = stringResource(R.string.plan_monthly_choice_title),
+                    subtitle = monthlyPlan?.let {
+                        stringResource(R.string.plan_monthly_choice_subtitle_template, it.formattedPrice)
+                    } ?: stringResource(R.string.plan_unavailable),
+                    trailing = when {
+                        isPremium && activePlanType == PremiumPlanType.MONTHLY -> stringResource(R.string.plan_active_label)
+                        else -> stringResource(R.string.plan_monthly_choice_trailing)
+                    },
+                    badge = null,
+                    selected = (isPremium && activePlanType == PremiumPlanType.MONTHLY) || (!isPremium && selectedPlan == SelectedPlan.MONTHLY),
+                    enabled = monthlyPlan != null && !isPremium,
+                    containerColor = optionSurface,
+                    borderColor = if ((isPremium && activePlanType == PremiumPlanType.MONTHLY) || (!isPremium && selectedPlan == SelectedPlan.MONTHLY)) {
+                        highlightBorder
+                    } else {
+                        optionBorder
+                    },
+                    textColor = Color.White,
+                    accentColor = AccentGold,
+                    onClick = { selectedPlan = SelectedPlan.MONTHLY }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PlanOptionCard(
+                    title = stringResource(R.string.plan_lifetime_choice_title),
+                    subtitle = lifetimePlan?.let {
+                        stringResource(R.string.plan_lifetime_choice_subtitle_template, it.formattedPrice)
+                    } ?: stringResource(R.string.plan_unavailable),
+                    trailing = when {
+                        isPremium && activePlanType == PremiumPlanType.LIFETIME -> stringResource(R.string.plan_active_label)
+                        else -> stringResource(R.string.plan_lifetime_choice_trailing)
+                    },
+                    badge = null,
+                    selected = (isPremium && activePlanType == PremiumPlanType.LIFETIME) || (!isPremium && selectedPlan == SelectedPlan.LIFETIME),
+                    enabled = lifetimePlan != null && !isPremium,
+                    containerColor = optionSurface,
+                    borderColor = if ((isPremium && activePlanType == PremiumPlanType.LIFETIME) || (!isPremium && selectedPlan == SelectedPlan.LIFETIME)) {
+                        highlightBorder
+                    } else {
+                        optionBorder
+                    },
+                    textColor = Color.White,
+                    accentColor = AccentGold,
+                    onClick = { selectedPlan = SelectedPlan.LIFETIME }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -240,12 +321,17 @@ fun PlanSelectionScreen(
                     subtitle = stringResource(R.string.plan_free_choice_subtitle),
                     trailing = stringResource(R.string.plan_free_choice_trailing),
                     badge = null,
-                    selected = selectedPlan == SelectedPlan.FREE && !isPremium,
+                    selected = !isPremium && selectedPlan == SelectedPlan.FREE,
+                    enabled = !isPremium,
                     containerColor = optionSurface,
-                    borderColor = if (selectedPlan == SelectedPlan.FREE && !isPremium) Color.White.copy(alpha = 0.44f) else optionBorder,
+                    borderColor = if (!isPremium && selectedPlan == SelectedPlan.FREE) {
+                        Color.White.copy(alpha = 0.44f)
+                    } else {
+                        optionBorder
+                    },
                     textColor = Color.White,
                     accentColor = Color.White,
-                    onClick = { if (!isPremium) selectedPlan = SelectedPlan.FREE }
+                    onClick = { selectedPlan = SelectedPlan.FREE }
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -261,10 +347,21 @@ fun PlanSelectionScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = if (selectedPlan == SelectedPlan.PREMIUM || isPremium) {
-                                stringResource(R.string.plan_footer_premium)
-                            } else {
-                                stringResource(R.string.plan_footer_free)
+                            text = when {
+                                isPremium && activePlanType == PremiumPlanType.YEARLY ->
+                                    stringResource(R.string.plan_footer_yearly)
+                                isPremium && activePlanType == PremiumPlanType.MONTHLY ->
+                                    stringResource(R.string.plan_footer_monthly)
+                                isPremium && activePlanType == PremiumPlanType.LIFETIME ->
+                                    stringResource(R.string.plan_footer_lifetime)
+                                isPremium -> stringResource(R.string.plan_footer_premium)
+                                selectedPlan == SelectedPlan.YEARLY ->
+                                    stringResource(R.string.plan_footer_yearly)
+                                selectedPlan == SelectedPlan.MONTHLY ->
+                                    stringResource(R.string.plan_footer_monthly)
+                                selectedPlan == SelectedPlan.LIFETIME ->
+                                    stringResource(R.string.plan_footer_lifetime)
+                                else -> stringResource(R.string.plan_footer_free)
                             },
                             color = Color.White,
                             style = MaterialTheme.typography.bodyLarge,
@@ -275,16 +372,22 @@ fun PlanSelectionScreen(
 
                         Button(
                             onClick = {
-                                if (isPremium) {
-                                    onBack()
-                                } else if (selectedPlan == SelectedPlan.PREMIUM) {
-                                    val activity = context as? Activity ?: return@Button
-                                    vm.launchPremiumPurchase(activity)
-                                } else {
-                                    onBack()
+                                when {
+                                    isPremium -> onBack()
+                                    selectedPlan == SelectedPlan.FREE -> onBack()
+                                    else -> {
+                                        val activity = context as? Activity ?: return@Button
+                                        val planType = selectedPremiumType ?: return@Button
+                                        vm.launchPremiumPurchase(activity, planType)
+                                    }
                                 }
                             },
-                            enabled = isPremium || selectedPlan == SelectedPlan.FREE || billingReady,
+                            enabled = when {
+                                isPremium -> true
+                                selectedPlan == SelectedPlan.FREE -> true
+                                !billingReady -> false
+                                else -> selectedPremiumPlan != null
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = AccentGold,
@@ -295,9 +398,12 @@ fun PlanSelectionScreen(
                             Text(
                                 text = when {
                                     isPremium -> stringResource(R.string.premium_active)
-                                    selectedPlan == SelectedPlan.PREMIUM && billingReady -> stringResource(R.string.plan_start_premium)
-                                    selectedPlan == SelectedPlan.PREMIUM -> stringResource(R.string.connecting_play_billing)
-                                    else -> stringResource(R.string.plan_continue_free)
+                                    selectedPlan == SelectedPlan.YEARLY -> stringResource(R.string.plan_start_yearly)
+                                    selectedPlan == SelectedPlan.MONTHLY -> stringResource(R.string.plan_start_monthly)
+                                    selectedPlan == SelectedPlan.LIFETIME -> stringResource(R.string.plan_start_lifetime)
+                                    selectedPlan == SelectedPlan.FREE -> stringResource(R.string.plan_continue_free)
+                                    !billingReady -> stringResource(R.string.connecting_play_billing)
+                                    else -> stringResource(R.string.plan_start_premium)
                                 },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 22.sp,
@@ -321,6 +427,24 @@ fun PlanSelectionScreen(
                 }
             }
         }
+    }
+}
+
+private fun defaultSelectedPlan(
+    isPremium: Boolean,
+    activePlanType: PremiumPlanType?,
+    yearlyPlan: PremiumPlanOption?,
+    monthlyPlan: PremiumPlanOption?,
+    lifetimePlan: PremiumPlanOption?
+): SelectedPlan {
+    return when {
+        isPremium && activePlanType == PremiumPlanType.YEARLY -> SelectedPlan.YEARLY
+        isPremium && activePlanType == PremiumPlanType.MONTHLY -> SelectedPlan.MONTHLY
+        isPremium && activePlanType == PremiumPlanType.LIFETIME -> SelectedPlan.LIFETIME
+        yearlyPlan != null -> SelectedPlan.YEARLY
+        monthlyPlan != null -> SelectedPlan.MONTHLY
+        lifetimePlan != null -> SelectedPlan.LIFETIME
+        else -> SelectedPlan.FREE
     }
 }
 
@@ -361,18 +485,20 @@ private fun PlanOptionCard(
     trailing: String,
     badge: String?,
     selected: Boolean,
+    enabled: Boolean,
     containerColor: Color,
     borderColor: Color,
     textColor: Color,
     accentColor: Color,
     onClick: () -> Unit
 ) {
+    val contentAlpha = if (enabled || selected) 1f else 0.55f
+
     Box {
         if (badge != null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 0.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(AccentGold)
                     .padding(horizontal = 18.dp, vertical = 8.dp)
@@ -389,10 +515,10 @@ private fun PlanOptionCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = if (badge != null) 20.dp else 0.dp)
-                .clickable(onClick = onClick),
+                .clickable(enabled = enabled, onClick = onClick),
             shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+            colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = contentAlpha)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor.copy(alpha = contentAlpha))
         ) {
             Row(
                 modifier = Modifier
@@ -405,7 +531,11 @@ private fun PlanOptionCard(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .border(2.dp, if (selected) accentColor else Color.White.copy(alpha = 0.55f), CircleShape),
+                        .border(
+                            2.dp,
+                            if (selected) accentColor else Color.White.copy(alpha = 0.55f * contentAlpha),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (selected) {
@@ -421,21 +551,21 @@ private fun PlanOptionCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        color = textColor,
+                        color = textColor.copy(alpha = contentAlpha),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = subtitle,
-                        color = textColor.copy(alpha = 0.88f),
+                        color = textColor.copy(alpha = 0.88f * contentAlpha),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
 
                 Text(
                     text = trailing,
-                    color = textColor.copy(alpha = 0.86f),
+                    color = textColor.copy(alpha = 0.86f * contentAlpha),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.End

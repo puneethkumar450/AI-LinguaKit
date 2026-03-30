@@ -37,18 +37,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.android.billingclient.api.BillingClient
 import com.puneeth50.ailinguakit.R
 import com.puneeth50.ailinguakit.service.AppThemeMode
-import com.puneeth50.ailinguakit.service.PremiumProduct
+import com.puneeth50.ailinguakit.service.PremiumPlanOption
+import com.puneeth50.ailinguakit.service.PremiumPlanType
 import com.puneeth50.ailinguakit.ui.theme.AccentGold
 import com.puneeth50.ailinguakit.ui.theme.BrandBlue
+import com.puneeth50.ailinguakit.ui.theme.highlightCardBrush
 import com.puneeth50.ailinguakit.viewmodel.AppViewModel
 import kotlin.math.ceil
 
@@ -64,7 +64,8 @@ fun SettingsScreenUI(
 ) {
     val themeMode by vm.themeMode.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
-    val premiumProduct by vm.premiumProduct.collectAsState()
+    val availablePremiumPlans by vm.availablePremiumPlans.collectAsState()
+    val activePremiumPlanType by vm.activePremiumPlanType.collectAsState()
     val rewardWallet by vm.rewardWallet.collectAsState()
     val rewardsSubtitle = rememberRewardSettingsSubtitle(
         isPremium = isPremium,
@@ -96,7 +97,8 @@ fun SettingsScreenUI(
             item {
                 CurrentPlanCard(
                     isPremium = isPremium,
-                    premiumProduct = premiumProduct,
+                    availablePlans = availablePremiumPlans,
+                    activePlanType = activePremiumPlanType,
                     onClick = onOpenPlanSelection
                 )
             }
@@ -161,38 +163,28 @@ fun SettingsScreenUI(
 @Composable
 private fun CurrentPlanCard(
     isPremium: Boolean,
-    premiumProduct: PremiumProduct?,
+    availablePlans: List<PremiumPlanOption>,
+    activePlanType: PremiumPlanType?,
     onClick: () -> Unit
 ) {
-    val backgroundBrush = if (isPremium) {
-        Brush.verticalGradient(
-            colors = listOf(
-                BrandBlue,
-                Color(0xFF3459D1),
-                Color(0xFF2946A7)
-            )
-        )
-    } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                MaterialTheme.colorScheme.primaryContainer,
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
-            )
-        )
+    val backgroundBrush = highlightCardBrush()
+
+    val activePlan = activePlanType?.let { selectedType ->
+        availablePlans.firstOrNull { it.type == selectedType }
     }
 
     val title = if (isPremium) {
-        currentPremiumTitle(premiumProduct)
+        currentPremiumTitle(activePlanType)
     } else {
         stringResource(R.string.settings_plan_free_title)
     }
     val subtitle = if (isPremium) {
-        currentPremiumSubtitle(premiumProduct)
+        currentPremiumSubtitle(activePlanType, activePlan)
     } else {
         stringResource(R.string.settings_plan_free_subtitle)
     }
     val body = if (isPremium) {
-        currentPremiumBody(premiumProduct)
+        currentPremiumBody(activePlanType)
     } else {
         stringResource(R.string.settings_plan_free_body)
     }
@@ -230,23 +222,19 @@ private fun CurrentPlanCard(
                             } else {
                                 stringResource(R.string.settings_plan_chip_free)
                             },
-                            background = if (isPremium) AccentGold else MaterialTheme.colorScheme.secondaryContainer,
-                            content = if (isPremium) BrandBlue else MaterialTheme.colorScheme.onSecondaryContainer
+                            background = if (isPremium) AccentGold else Color.White.copy(alpha = 0.18f),
+                            content = if (isPremium) BrandBlue else Color.White
                         )
                         Text(
                             text = title,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color = if (isPremium) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                            color = Color.White
                         )
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.titleSmall,
-                            color = if (isPremium) {
-                                Color.White.copy(alpha = 0.86f)
-                            } else {
-                                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
-                            }
+                            color = Color.White.copy(alpha = 0.86f)
                         )
                     }
 
@@ -273,19 +261,33 @@ private fun CurrentPlanCard(
                 Text(
                     text = body,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isPremium) {
-                        Color.White.copy(alpha = 0.92f)
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f)
-                    }
+                    color = Color.White.copy(alpha = 0.92f)
                 )
 
                 if (!isPremium) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        PlanMiniPill(stringResource(R.string.plan_benefit_unlimited_words))
-                        PlanMiniPill(stringResource(R.string.plan_benefit_unlimited_languages))
+                        availablePlans
+                            .sortedBy { it.type.settingsOrder() }
+                            .forEach { plan ->
+                                PlanMiniPill(
+                                    text = when (plan.type) {
+                                        PremiumPlanType.MONTHLY -> stringResource(
+                                            R.string.settings_plan_chip_monthly_template,
+                                            plan.formattedPrice
+                                        )
+                                        PremiumPlanType.YEARLY -> stringResource(
+                                            R.string.settings_plan_chip_yearly_template,
+                                            plan.formattedPrice
+                                        )
+                                        PremiumPlanType.LIFETIME -> stringResource(
+                                            R.string.settings_plan_chip_lifetime_template,
+                                            plan.formattedPrice
+                                        )
+                                    }
+                                )
+                            }
                     }
                 }
 
@@ -347,7 +349,7 @@ private fun PlanMiniPill(text: String) {
     ) {
         Text(
             text = text,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = Color.White,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium
         )
@@ -355,48 +357,44 @@ private fun PlanMiniPill(text: String) {
 }
 
 @Composable
-private fun currentPremiumTitle(product: PremiumProduct?): String {
-    val billingPeriod = subscriptionBillingPeriod(product)
+private fun currentPremiumTitle(activePlanType: PremiumPlanType?): String {
     return when {
-        product?.productType == BillingClient.ProductType.INAPP -> stringResource(R.string.settings_plan_lifetime_title)
-        billingPeriod == "P1Y" -> stringResource(R.string.settings_plan_yearly_title)
-        billingPeriod == "P1M" -> stringResource(R.string.settings_plan_monthly_title)
+        activePlanType == PremiumPlanType.LIFETIME -> stringResource(R.string.settings_plan_lifetime_title)
+        activePlanType == PremiumPlanType.YEARLY -> stringResource(R.string.settings_plan_yearly_title)
+        activePlanType == PremiumPlanType.MONTHLY -> stringResource(R.string.settings_plan_monthly_title)
         else -> stringResource(R.string.settings_plan_premium_title)
     }
 }
 
 @Composable
-private fun currentPremiumSubtitle(product: PremiumProduct?): String {
-    val billingPeriod = subscriptionBillingPeriod(product)
-    val price = product?.formattedPrice ?: stringResource(R.string.see_play_store)
+private fun currentPremiumSubtitle(
+    activePlanType: PremiumPlanType?,
+    activePlan: PremiumPlanOption?
+): String {
+    val price = activePlan?.formattedPrice ?: stringResource(R.string.see_play_store)
     return when {
-        product?.productType == BillingClient.ProductType.INAPP -> stringResource(R.string.settings_plan_lifetime_subtitle)
-        billingPeriod == "P1Y" -> stringResource(R.string.settings_plan_yearly_subtitle, price)
-        billingPeriod == "P1M" -> stringResource(R.string.settings_plan_monthly_subtitle, price)
-        product != null -> stringResource(R.string.settings_plan_premium_subtitle_generic, price)
+        activePlanType == PremiumPlanType.LIFETIME -> stringResource(R.string.settings_plan_lifetime_subtitle)
+        activePlanType == PremiumPlanType.YEARLY -> stringResource(R.string.settings_plan_yearly_subtitle, price)
+        activePlanType == PremiumPlanType.MONTHLY -> stringResource(R.string.settings_plan_monthly_subtitle, price)
+        activePlan != null -> stringResource(R.string.settings_plan_premium_subtitle_generic, price)
         else -> stringResource(R.string.premium_active)
     }
 }
 
 @Composable
-private fun currentPremiumBody(product: PremiumProduct?): String {
-    val billingPeriod = subscriptionBillingPeriod(product)
+private fun currentPremiumBody(activePlanType: PremiumPlanType?): String {
     return when {
-        product?.productType == BillingClient.ProductType.INAPP -> stringResource(R.string.settings_plan_lifetime_body)
-        billingPeriod == "P1Y" -> stringResource(R.string.settings_plan_subscription_body_yearly)
-        billingPeriod == "P1M" -> stringResource(R.string.settings_plan_subscription_body_monthly)
+        activePlanType == PremiumPlanType.LIFETIME -> stringResource(R.string.settings_plan_lifetime_body)
+        activePlanType == PremiumPlanType.YEARLY -> stringResource(R.string.settings_plan_subscription_body_yearly)
+        activePlanType == PremiumPlanType.MONTHLY -> stringResource(R.string.settings_plan_subscription_body_monthly)
         else -> stringResource(R.string.settings_plan_subscription_body_generic)
     }
 }
 
-private fun subscriptionBillingPeriod(product: PremiumProduct?): String? {
-    if (product?.productType != BillingClient.ProductType.SUBS) return null
-    return product.productDetails.subscriptionOfferDetails
-        ?.firstOrNull()
-        ?.pricingPhases
-        ?.pricingPhaseList
-        ?.lastOrNull()
-        ?.billingPeriod
+private fun PremiumPlanType.settingsOrder(): Int = when (this) {
+    PremiumPlanType.YEARLY -> 0
+    PremiumPlanType.MONTHLY -> 1
+    PremiumPlanType.LIFETIME -> 2
 }
 
 @Composable
