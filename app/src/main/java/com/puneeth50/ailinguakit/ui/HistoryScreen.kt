@@ -314,7 +314,7 @@ private fun HistoryCard(
                 ) {
                     Text(
                         entry.sourceLangName,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -326,7 +326,7 @@ private fun HistoryCard(
                     )
                     Text(
                         entry.targetLangName,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -335,7 +335,7 @@ private fun HistoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         dateFormatter.format(Date(entry.timestampMs)),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                     )
                     Spacer(Modifier.width(4.dp))
@@ -358,7 +358,7 @@ private fun HistoryCard(
             // Source text (always visible, collapsed)
             Text(
                 entry.sourceText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = if (isExpanded) Int.MAX_VALUE else 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
@@ -376,8 +376,8 @@ private fun HistoryCard(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         entry.translatedText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f),
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(Modifier.height(12.dp))
@@ -427,11 +427,15 @@ private fun HistoryCard(
 
             // Collapse indicator
             if (!isExpanded) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    stringResource(R.string.tap_to_see_translation),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    /*modifier = Modifier.background(
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        RoundedCornerShape(8.dp)
+                    ).padding(horizontal = 8.dp, vertical = 4.dp),*/
+                    text = stringResource(R.string.tap_to_see_translation),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                 )
             }
         }
