@@ -272,7 +272,7 @@ private fun MainTranslateView(
                 FloatingActionButton(
                     onClick = { onPasteAndTranslate(normalizedClipboardText) },
                     containerColor = colorScheme.primary,
-                    contentColor = Color.White
+                    contentColor = colorScheme.onPrimary
                 ) {
                     Icon(
                         Icons.Default.ContentPaste,
@@ -304,7 +304,7 @@ private fun MainTranslateView(
                     placeholder = {
                         Text(
                             text = stringResource(id = R.string.enter_text_placeholder),
-                            style = TextStyle(color = Color.Gray, fontSize = 26.sp)
+                            style = TextStyle(color = colorScheme.onSurfaceVariant, fontSize = 26.sp)
                         )
                     },
                     colors = TextFieldDefaults.colors(
@@ -334,12 +334,12 @@ private fun MainTranslateView(
 
                 if (translatedText.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
+                    HorizontalDivider(color = colorScheme.outlineVariant.copy(alpha = 0.6f))
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = translatedText,
                         style = TextStyle(
-                            color = Color(0xFF1F6FEB),
+                            color = colorScheme.primary,
                             fontSize = inputFontSize,
                             fontWeight = FontWeight.Normal
                         ),
@@ -380,7 +380,7 @@ private fun MainTranslateView(
                         .padding(bottom = 21.dp, start = 24.dp, end = 24.dp),
                     onClick = { onPasteAndTranslate(normalizedClipboardText) },
                     containerColor = colorScheme.primary,
-                    contentColor = Color.White
+                    contentColor = colorScheme.onPrimary
                 ) {
                     Icon(
                         Icons.Rounded.ContentPaste,
@@ -392,7 +392,7 @@ private fun MainTranslateView(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    color = Color.Gray.copy(0.2f)
+                    color = colorScheme.surfaceVariant
                 ) {
                     Column(
                         modifier = Modifier.padding(top = 18.dp, bottom = 28.dp, start = 24.dp, end = 24.dp),
@@ -458,7 +458,7 @@ private fun MainTranslateView(
                             Button(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = colorScheme.primary,
-                                    contentColor = Color.White
+                                    contentColor = colorScheme.onPrimary
                                 ),
                                 onClick = onPrimaryAction,
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -501,7 +501,7 @@ private fun LinearLoadingRow() {
 fun SectionHeaderTitle(text: String) {
     Text(
         text = text,
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
     )
@@ -538,8 +538,8 @@ fun LanguageItem(
         },
         trailingContent = {
             when {
-                lang.code == selected.code -> Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected), tint = Color(0xFF1F6FEB))
-                !enabled -> Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.locked), tint = Color.Gray)
+                lang.code == selected.code -> Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected), tint = colors.primary)
+                !enabled -> Icon(Icons.Default.Lock, contentDescription = stringResource(R.string.locked), tint = colors.onSurfaceVariant)
             }
         },
         colors = ListItemDefaults.colors(containerColor =
@@ -547,7 +547,7 @@ fun LanguageItem(
             else Color.Transparent),
         modifier = if (enabled) Modifier.clickable { onSelect(lang) } else Modifier
     )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color.Black.copy(alpha = 0.05f))
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = colors.outlineVariant.copy(alpha = 0.45f))
 }
 
 @Composable
@@ -564,7 +564,7 @@ private fun LanguageButton(
         enabled = enabled,
         modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(16.dp),
-        border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
+        border = if (!enabled) BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.6f)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
@@ -648,7 +648,7 @@ private fun KeyboardLanguageButton(
         enabled = enabled,
         modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(18.dp),
-        border = if (!enabled) BorderStroke(1.dp, Color.LightGray.copy(0.3f)) else null
+        border = if (!enabled) BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.6f)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(

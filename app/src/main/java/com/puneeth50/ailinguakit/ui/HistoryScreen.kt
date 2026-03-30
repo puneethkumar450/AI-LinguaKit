@@ -132,10 +132,12 @@ fun HistoryScreen(vm: AppViewModel, onBack: () -> Unit, onRestore: () -> Unit) {
                     }
                 },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Gray.copy(0.15f),
-                    unfocusedContainerColor = Color.Gray.copy(0.15f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)

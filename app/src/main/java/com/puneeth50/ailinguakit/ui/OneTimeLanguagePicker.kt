@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.puneeth50.ailinguakit.R
+import com.puneeth50.ailinguakit.ui.theme.BrandBlue
 import com.puneeth50.ailinguakit.viewmodel.LanguageOption
 import com.puneeth50.ailinguakit.viewmodel.SUPPORTED_LANGUAGES
 
@@ -78,7 +79,7 @@ fun OneTimeLanguagePicker(
                                 .padding(end = 16.dp)
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFE91E63))
+                                .background(BrandBlue)
                                 .clickable { 
                                     onLanguagesSelected(selectedLanguages[0], selectedLanguages[1]) 
                                 },
@@ -100,10 +101,14 @@ fun OneTimeLanguagePicker(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                )
             )
         },
-        containerColor = Color.White
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -151,7 +156,7 @@ fun LanguageGridItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val borderColor = if (isSelected) Color(0xFFE91E63) else Color(0xFFF5F5F5)
+    val borderColor = if (isSelected) BrandBlue else MaterialTheme.colorScheme.outlineVariant
     
     Card(
         modifier = Modifier
@@ -159,7 +164,7 @@ fun LanguageGridItem(
             .aspectRatio(1.1f)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -182,7 +187,8 @@ fun LanguageGridItem(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp
                 ),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = if (isSelected) BrandBlue else MaterialTheme.colorScheme.onSurface
             )
         }
     }

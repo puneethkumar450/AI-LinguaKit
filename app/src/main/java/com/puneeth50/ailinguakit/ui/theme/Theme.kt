@@ -16,33 +16,34 @@ private val DarkColorScheme = darkColorScheme(
     primary = BrandBlueDark,
     secondary = AccentGoldDark,
     background = BrandSurfaceDark,
-    surface = BrandSurfaceDark,
+    surface = BrandPanelDark,
     onPrimary = TextPrimaryDark,
     onSecondary = TextPrimaryDark,
     onBackground = TextPrimaryDark,
     onSurface = TextPrimaryDark,
-    primaryContainer =  BrandBlue.copy(0.12f),
+    primaryContainer = BrandBlue.copy(alpha = 0.22f),
     onPrimaryContainer = Color.White,
-    onSurfaceVariant = Color.White.copy(0.7f),
-    //surfaceVariant = Color.Black.copy(0.6f)
-    surfaceVariant = BrandBlue.copy(0.15f)
+    onSurfaceVariant = Color.White.copy(alpha = 0.72f),
+    surfaceVariant = BrandPanelDark,
+    outline = BrandOutlineDark,
+    outlineVariant = BrandOutlineDark.copy(alpha = 0.6f)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = BrandBlue,
     secondary = AccentGold,
     background = BrandSurface,
-    surface = Color.White,
+    surface = BrandPanel,
     onPrimary = Color.White,
     onSecondary = TextPrimaryLight,
     onBackground = TextPrimaryLight,
     onSurface = TextPrimaryLight,
-    primaryContainer =  BrandBlue.copy(0.1f),
-    onPrimaryContainer = Color.Black,
-    onSurfaceVariant = Color.Black.copy(0.7f),
-    //surfaceVariant = Color.White
-    surfaceVariant = BrandBlue.copy(0.1f),
-
+    primaryContainer = BrandBlue.copy(alpha = 0.14f),
+    onPrimaryContainer = TextPrimaryLight,
+    onSurfaceVariant = TextPrimaryLight.copy(alpha = 0.72f),
+    surfaceVariant = Color.White,
+    outline = BrandOutline,
+    outlineVariant = BrandOutline.copy(alpha = 0.58f)
 )
 
 @Composable
