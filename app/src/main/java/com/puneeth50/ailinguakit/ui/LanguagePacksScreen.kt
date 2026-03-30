@@ -89,15 +89,18 @@ fun LanguagePacksScreen(
     val downloading by vm.downloadingPacks.collectAsState()
     val downloadProgress by vm.packDownloadProgress.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
+    val rewardWallet by vm.rewardWallet.collectAsState()
 
     LanguagePacksContent(
         allPacks = allPacks,
         downloading = downloading,
         downloadProgress = downloadProgress,
         isPremium = isPremium,
+        extraSlotCredits = rewardWallet.extraSlotCredits,
         onBack = onBack,
         onRefresh = { vm.refreshPackStatus() },
         onDownload = { code, wifi -> vm.downloadPack(code, wifi) },
+        onRewardDownload = { code, wifi -> vm.requestPackSlotRewardAndDownload(code, wifi) },
         onCancelDownload = { code -> vm.cancelPackDownload(code) },
         onDelete = { code -> vm.deletePack(code) },
         canDownload = { code -> vm.canDownloadPack(code) }
@@ -111,16 +114,18 @@ private fun LanguagePacksContent(
     downloading: Set<String>,
     downloadProgress: Map<String, Int>,
     isPremium: Boolean,
+    extraSlotCredits: Int,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onDownload: (String, Boolean) -> Unit,
+    onRewardDownload: (String, Boolean) -> Unit,
     onCancelDownload: (String) -> Unit,
     onDelete: (String) -> Unit,
     canDownload: (String) -> Boolean
 ) {
     var wifiOnly by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
-    var showUpgradeDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
+    var showRewardDialog by remember { mutableStateOf<LanguagePackEntity?>(null) }
 
     val downloadedCount = allPacks.count { it.status == PackStatus.DOWNLOADED }
     val totalCount = allPacks.size
@@ -204,7 +209,11 @@ private fun LanguagePacksContent(
 
                         if (!isPremium) {
                             Text(
-                                stringResource(R.string.free_plan_languages_max),
+                                if (extraSlotCredits > 0) {
+                                    stringResource(R.string.free_plan_languages_reward_slot_template, extraSlotCredits)
+                                } else {
+                                    stringResource(R.string.free_plan_languages_max)
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.secondary
                             )
@@ -232,7 +241,11 @@ private fun LanguagePacksContent(
 
                 if (downloadedPacks.isNotEmpty()) {
                     item {
-                        SectionHeader(stringResource(R.string.downloaded_section_template, downloadedPacks.size), Icons.Default.CheckCircle, Color(0xFF16A34A))
+                        SectionHeader(
+                            stringResource(R.string.downloaded_section_template, downloadedPacks.size),
+                            Icons.Default.CheckCircle,
+                            MaterialTheme.colorScheme.primary
+                        )
                     }
                     items(downloadedPacks, key = { it.mlKitCode }) { pack ->
                         PackCard(
@@ -259,7 +272,7 @@ private fun LanguagePacksContent(
                                 if (canDownload(pack.mlKitCode)) {
                                     onDownload(pack.mlKitCode, wifiOnly)
                                 } else {
-                                    showUpgradeDialog = pack
+                                    showRewardDialog = pack
                                 }
                             },
                             onCancelDownload = { onCancelDownload(pack.mlKitCode) },
@@ -293,19 +306,25 @@ private fun LanguagePacksContent(
             )
         }
 
-        showUpgradeDialog?.let { pack ->
+        showRewardDialog?.let { pack ->
             AlertDialog(
-                onDismissRequest = { showUpgradeDialog = null },
-                title = { Text(stringResource(R.string.free_plan_limit_reached)) },
+                onDismissRequest = { showRewardDialog = null },
+                title = { Text(stringResource(R.string.rewards_pack_limit_title)) },
                 text = {
-                    Text(stringResource(R.string.free_plan_delete_language_to_download_template, pack.displayName))
+                    Text(stringResource(R.string.rewards_pack_limit_message_template, pack.displayName))
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            showUpgradeDialog = null
+                            showRewardDialog = null
+                            onRewardDownload(pack.mlKitCode, wifiOnly)
                         }
-                    ) { Text(stringResource(R.string.ok)) }
+                    ) { Text(stringResource(R.string.rewards_watch_to_unlock)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRewardDialog = null }) {
+                        Text(stringResource(R.string.history_clear_cancel))
+                    }
                 }
             )
         }
@@ -366,7 +385,11 @@ private fun PackCard(
                         contentDescription = null,
                         modifier = Modifier.rotate(rotation)
                     )
-                    pack.status == PackStatus.DOWNLOADED -> Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF16A34A))
+                    pack.status == PackStatus.DOWNLOADED -> Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                     pack.status == PackStatus.FAILED -> Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                     else -> Icon(Icons.Default.CloudOff, contentDescription = null)
                 }
@@ -432,7 +455,7 @@ private fun PackCard(
 private fun CircularPackIndicator() {
     LinearProgressIndicator(
         color = MaterialTheme.colorScheme.primary,
-        trackColor = Color.White,
+        trackColor = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.width(40.dp).height(4.dp)
     )
 }
@@ -441,7 +464,7 @@ private fun CircularPackIndicator() {
 private fun statusBg(status: PackStatus, isDownloading: Boolean): Color {
     return when {
         isDownloading -> MaterialTheme.colorScheme.primaryContainer
-        status == PackStatus.DOWNLOADED -> Color(0xFFDCFCE7)
+        status == PackStatus.DOWNLOADED -> MaterialTheme.colorScheme.primaryContainer
         status == PackStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
@@ -464,9 +487,11 @@ fun LanguagePacksScreenPreview() {
             downloading = setOf("de"),
             downloadProgress = mapOf("de" to 62),
             isPremium = false,
+            extraSlotCredits = 0,
             onBack = {},
             onRefresh = {},
             onDownload = { _, _ -> },
+            onRewardDownload = { _, _ -> },
             onCancelDownload = { _ -> },
             onDelete = { _ -> },
             canDownload = { true }

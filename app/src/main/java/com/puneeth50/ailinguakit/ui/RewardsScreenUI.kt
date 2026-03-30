@@ -6,13 +6,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -28,15 +33,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.puneeth50.ailinguakit.R
+import com.puneeth50.ailinguakit.ui.theme.AccentGold
+import com.puneeth50.ailinguakit.ui.theme.AccentGoldDark
 import com.puneeth50.ailinguakit.viewmodel.RewardCardUi
 import com.puneeth50.ailinguakit.viewmodel.RewardsViewModel
+import kotlinx.coroutines.delay
+import kotlin.math.ceil
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,68 +80,160 @@ fun RewardsScreenUI(
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            item {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 ) {
-                    Text(
-                        stringResource(R.string.rewards_header_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        stringResource(
-                            if (state.isPremium) R.string.rewards_header_premium_body else R.string.rewards_header_free_body
-                        ),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        RewardsSummaryChip(
-                            title = stringResource(R.string.rewards_words_left),
-                            value = if (state.isPremium) stringResource(R.string.rewards_unlimited) else state.remainingWords.toString(),
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            stringResource(R.string.rewards_header_title),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
                         )
-                        RewardsSummaryChip(
-                            title = stringResource(R.string.rewards_language_slots),
-                            value = if (state.isPremium) stringResource(R.string.rewards_unlimited) else "${state.downloadedLanguages}/${vm.maxFreeLanguages()}",
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            stringResource(
+                                if (state.isPremium) R.string.rewards_header_premium_body else R.string.rewards_header_free_body
+                            ),
+                            style = MaterialTheme.typography.bodyMedium
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            RewardsSummaryChip(
+                                title = stringResource(R.string.rewards_words_left),
+                                value = if (state.isPremium) stringResource(R.string.rewards_unlimited) else state.remainingWords.toString(),
+                                modifier = Modifier.weight(1f)
+                            )
+                            RewardsSummaryChip(
+                                title = stringResource(R.string.rewards_language_slots),
+                                value = if (state.isPremium) {
+                                    stringResource(R.string.rewards_unlimited)
+                                } else {
+                                    "${state.downloadedLanguages}/${maxOf(vm.maxFreeLanguages() + state.extraSlotCredits, state.downloadedLanguages)}"
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        RewardsStatusPill(text = stringResource(state.activeRewardLabelRes))
                     }
-                    RewardsStatusPill(text = stringResource(state.activeRewardLabelRes))
                 }
             }
 
-            Text(
-                stringResource(R.string.rewards_available_now),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            state.rewardCards.forEach { reward ->
-                RewardFeatureCard(
-                    reward = reward,
-                    isPremium = state.isPremium
+            item {
+                Text(
+                    stringResource(R.string.rewards_wallet_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
+
+            item {
+                RewardsWalletCard(
+                    state = state,
+                    nowMs = rememberCurrentTimeMillis()
+                )
+            }
+
+            item {
+                Text(
+                    stringResource(R.string.rewards_available_now),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            items(
+                items = state.rewardCards,
+                key = { it.type.name }
+            ) { reward ->
+                RewardFeatureCard(
+                    reward = reward,
+                    onAction = { vm.requestReward(reward.type) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardsWalletCard(
+    state: com.puneeth50.ailinguakit.viewmodel.RewardsUiState,
+    nowMs: Long
+) {
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            RewardBalanceRow(
+                icon = Icons.Default.Bolt,
+                title = stringResource(R.string.reward_extra_words_title),
+                value = if (state.isPremium) {
+                    stringResource(R.string.rewards_unlimited)
+                } else {
+                    stringResource(R.string.rewards_bonus_words_template, state.bonusWordsRemaining)
+                }
+            )
+            RewardBalanceRow(
+                icon = Icons.Default.Language,
+                title = stringResource(R.string.reward_extra_slot_title),
+                value = if (state.isPremium) {
+                    stringResource(R.string.rewards_unlimited)
+                } else {
+                    stringResource(R.string.rewards_extra_slots_template, state.extraSlotCredits)
+                }
+            )
+            RewardBalanceRow(
+                icon = Icons.Default.GraphicEq,
+                title = stringResource(R.string.reward_speech_title),
+                value = if (state.isPremium) {
+                    stringResource(R.string.rewards_included_in_plan)
+                } else {
+                    rewardExpiryText(
+                        nowMs = nowMs,
+                        untilMs = state.speechUnlockUntilMs,
+                        activeLabel = R.string.rewards_time_left_template,
+                        inactiveLabel = R.string.rewards_not_active
+                    )
+                }
+            )
+            RewardBalanceRow(
+                icon = Icons.Default.Campaign,
+                title = stringResource(R.string.reward_ad_free_title),
+                value = if (state.isPremium) {
+                    stringResource(R.string.rewards_included_in_plan)
+                } else {
+                    rewardExpiryText(
+                        nowMs = nowMs,
+                        untilMs = state.adFreeUntilMs,
+                        activeLabel = R.string.rewards_time_left_template,
+                        inactiveLabel = R.string.rewards_not_active
+                    )
+                }
+            )
         }
     }
 }
@@ -155,11 +260,16 @@ private fun RewardsSummaryChip(
 }
 
 @Composable
-private fun RewardsStatusPill(text: String) {
+private fun RewardsStatusPill(
+    text: String,
+    containerColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+    textColor: Color = MaterialTheme.colorScheme.primary,
+    fontWeight: FontWeight = FontWeight.SemiBold
+) {
     Box(
         modifier = Modifier
             .background(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                color = containerColor,
                 shape = CircleShape
             )
             .padding(horizontal = 14.dp, vertical = 8.dp)
@@ -167,8 +277,8 @@ private fun RewardsStatusPill(text: String) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold
+            color = textColor,
+            fontWeight = fontWeight
         )
     }
 }
@@ -176,7 +286,7 @@ private fun RewardsStatusPill(text: String) {
 @Composable
 private fun RewardFeatureCard(
     reward: RewardCardUi,
-    isPremium: Boolean
+    onAction: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(22.dp),
@@ -200,7 +310,24 @@ private fun RewardFeatureCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                RewardsStatusPill(text = stringResource(reward.badgeRes))
+                RewardsStatusPill(
+                    text = stringResource(reward.badgeRes),
+                    containerColor = if (reward.badgeRes == R.string.rewards_active_badge) {
+                        activeRewardBadgeContainerColor()
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    },
+                    textColor = if (reward.badgeRes == R.string.rewards_active_badge) {
+                        activeRewardBadgeTextColor()
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    fontWeight = if (reward.badgeRes == R.string.rewards_active_badge) {
+                        FontWeight.Bold
+                    } else {
+                        FontWeight.SemiBold
+                    }
+                )
             }
             Text(
                 text = stringResource(reward.subtitleRes),
@@ -208,21 +335,95 @@ private fun RewardFeatureCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(
-                onClick = {},
-                enabled = false,
+                onClick = onAction,
+                enabled = reward.enabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.WorkspacePremium, contentDescription = null)
                 Spacer(modifier = Modifier.padding(4.dp))
-                Text(
-                    stringResource(
-                        if (isPremium) R.string.rewards_included_in_plan
-                        else if (reward.comingSoon) R.string.rewards_coming_soon
-                        else R.string.rewards_watch_to_unlock
-                    )
-                )
+                Text(stringResource(reward.actionLabelRes))
             }
         }
+    }
+}
+
+@Composable
+private fun RewardBalanceRow(
+    icon: ImageVector,
+    title: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        ) {
+            Box(
+                modifier = Modifier.padding(10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberCurrentTimeMillis(): Long {
+    val now by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
+    return now
+}
+
+@Composable
+private fun rewardExpiryText(
+    nowMs: Long,
+    untilMs: Long,
+    activeLabel: Int,
+    inactiveLabel: Int
+): String {
+    if (untilMs <= nowMs) {
+        return stringResource(inactiveLabel)
+    }
+    val minutesLeft = ceil((untilMs - nowMs) / 60_000.0).toInt().coerceAtLeast(1)
+    return stringResource(activeLabel, minutesLeft)
+}
+
+@Composable
+private fun activeRewardBadgeContainerColor(): Color {
+    return if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        AccentGold.copy(alpha = 0.18f)
+    } else {
+        AccentGoldDark.copy(alpha = 0.2f)
+    }
+}
+
+@Composable
+private fun activeRewardBadgeTextColor(): Color {
+    return if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        AccentGoldDark
+    } else {
+        AccentGold
     }
 }

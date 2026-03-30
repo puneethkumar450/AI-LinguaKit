@@ -33,10 +33,12 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -52,6 +54,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,7 +65,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -88,6 +94,7 @@ fun ModernTranslateScreen(
     vm: AppViewModel,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToRewards: () -> Unit,
     onNavigateToSourcePicker: () -> Unit,
     onNavigateToTargetPicker: () -> Unit
 ) {
@@ -104,6 +111,11 @@ fun ModernTranslateScreen(
     val isSpeaking by vm.isSpeaking.collectAsState()
     val historyItems by vm.allHistory.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
+    val rewardWallet by vm.rewardWallet.collectAsState()
+    val showWordRewardPrompt by vm.showWordRewardPrompt.collectAsState()
+    var showSpeechRewardDialog by rememberSaveable { mutableStateOf(false) }
+    val speechUnlocked = isPremium || rewardWallet.speechUnlockUntilMs > System.currentTimeMillis()
+    val showBannerAd = !isPremium && rewardWallet.adFreeUntilMs <= System.currentTimeMillis()
 
     val recordAudioPermissionState = rememberPermissionState(android.Manifest.permission.RECORD_AUDIO)
 
@@ -131,15 +143,17 @@ fun ModernTranslateScreen(
         historyCount = historyItems.size,
         isPremium = isPremium,
         onInputChange = vm::onTranslateInputChange,
-        onPrimaryAction = {
-            if (isPremium) {
+        speechUnlocked = speechUnlocked,
+        onTranslateAction = { vm.translateFromPrimaryAction() },
+        onSpeechAction = {
+            if (speechUnlocked) {
                 if (recordAudioPermissionState.status.isGranted) {
                     if (isRecording) vm.stopRecording() else vm.startRecording()
                 } else {
                     recordAudioPermissionState.launchPermissionRequest()
                 }
             } else {
-                vm.translateFromPrimaryAction()
+                showSpeechRewardDialog = true
             }
         },
         onSecondaryTranslate = { vm.translateFromPrimaryAction() },
@@ -160,6 +174,7 @@ fun ModernTranslateScreen(
             vm.stopSpeaking()
             onNavigateToSettings()
         },
+        onRewardsClick = onNavigateToRewards,
         onSpeak = { vm.speakText(translatedText, targetLang.code) },
         onStopSpeaking = vm::stopSpeaking,
         onClearInput = vm::clearTranslation,
@@ -169,8 +184,49 @@ fun ModernTranslateScreen(
         },
         clipboardText = clipboardManager.getText()?.text.orEmpty(),
         canChangeLanguages = true,
-        showBannerAd = !isPremium
+        showBannerAd = showBannerAd
     )
+
+    if (showWordRewardPrompt && !isPremium) {
+        AlertDialog(
+            onDismissRequest = vm::dismissWordRewardPrompt,
+            title = { Text(stringResource(R.string.reward_extra_words_title)) },
+            text = { Text(stringResource(R.string.rewards_word_limit_dialog_message)) },
+            confirmButton = {
+                TextButton(onClick = vm::requestWordRewardAndRetry) {
+                    Text(stringResource(R.string.rewards_watch_to_earn))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::dismissWordRewardPrompt) {
+                    Text(stringResource(R.string.history_clear_cancel))
+                }
+            }
+        )
+    }
+
+    if (showSpeechRewardDialog && !speechUnlocked) {
+        AlertDialog(
+            onDismissRequest = { showSpeechRewardDialog = false },
+            title = { Text(stringResource(R.string.reward_speech_title)) },
+            text = { Text(stringResource(R.string.rewards_speech_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSpeechRewardDialog = false
+                        vm.requestSpeechRewardAndRecord()
+                    }
+                ) {
+                    Text(stringResource(R.string.rewards_watch_to_unlock))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSpeechRewardDialog = false }) {
+                    Text(stringResource(R.string.history_clear_cancel))
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -186,14 +242,17 @@ private fun MainTranslateView(
     isSpeaking: Boolean,
     historyCount: Int,
     isPremium: Boolean,
+    speechUnlocked: Boolean,
     onInputChange: (String) -> Unit,
-    onPrimaryAction: () -> Unit,
+    onTranslateAction: () -> Unit,
+    onSpeechAction: () -> Unit,
     onSecondaryTranslate: () -> Unit,
     onLanguageSwap: () -> Unit,
     onSourceLangClick: () -> Unit,
     onTargetLangClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onRewardsClick: () -> Unit,
     onSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
     onClearInput: () -> Unit,
@@ -245,6 +304,13 @@ private fun MainTranslateView(
                             ) {
                                 Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.clear))
                             }
+                        }
+
+                        IconButton(onClick = onRewardsClick) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = stringResource(R.string.rewards_open_premium)
+                            )
                         }
 
                         IconButton(onClick = onSettingsClick) {
@@ -442,7 +508,7 @@ private fun MainTranslateView(
                                     Text(stringResource(R.string.translate))
                                 }
                                 Button(
-                                    onClick = onPrimaryAction,
+                                    onClick = onSpeechAction,
                                     modifier = Modifier.weight(1f).height(54.dp),
                                     shape = RoundedCornerShape(16.dp)
                                 ) {
@@ -455,18 +521,47 @@ private fun MainTranslateView(
                                 }
                             }
                         } else {
-                            Button(
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colorScheme.primary,
-                                    contentColor = colorScheme.onPrimary
-                                ),
-                                onClick = onPrimaryAction,
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = RoundedCornerShape(18.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Translate, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.translate))
+                                Button(
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colorScheme.primary,
+                                        contentColor = colorScheme.onPrimary
+                                    ),
+                                    onClick = onTranslateAction,
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(18.dp)
+                                ) {
+                                    Icon(Icons.Default.Translate, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.translate))
+                                }
+                                OutlinedButton(
+                                    onClick = onSpeechAction,
+                                    modifier = Modifier.height(56.dp),
+                                    shape = RoundedCornerShape(18.dp),
+                                    border = BorderStroke(1.dp, colorScheme.outline)
+                                ) {
+                                    Icon(
+                                        if (speechUnlocked) {
+                                            if (isRecording) Icons.Default.Stop else Icons.Default.Mic
+                                        } else {
+                                            Icons.Default.Lock
+                                        },
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (speechUnlocked) {
+                                            if (isRecording) stringResource(R.string.stop) else stringResource(R.string.speak)
+                                        } else {
+                                            stringResource(R.string.rewards_unlock_speech_button)
+                                        }
+                                    )
+                                }
                             }
                         }
 

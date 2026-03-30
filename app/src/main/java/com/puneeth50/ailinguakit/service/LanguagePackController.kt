@@ -22,6 +22,8 @@ class LanguagePackController(
     private val isPremium: StateFlow<Boolean>,
     private val scope: CoroutineScope,
     private val freeLanguageLimit: Int,
+    private val extraSlotCredits: StateFlow<RewardsWallet>,
+    private val onExtraSlotConsumed: () -> Unit,
     private val onMessage: suspend (String) -> Unit,
     private val onPackStateChanged: () -> Unit
 ) {
@@ -41,7 +43,8 @@ class LanguagePackController(
             .map { it.mlKitCode }
             .toMutableSet()
         reservedCodes += _downloadingPacks.value
-        return reservedCodes.contains(mlKitCode) || reservedCodes.size < freeLanguageLimit
+        val activeLimit = freeLanguageLimit + extraSlotCredits.value.extraSlotCredits
+        return reservedCodes.contains(mlKitCode) || reservedCodes.size < activeLimit
     }
 
     fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
@@ -49,6 +52,16 @@ class LanguagePackController(
             if (_downloadingPacks.value.contains(mlKitCode)) {
                 return@launch
             }
+
+            val reservedBefore = allPacks.value
+                .filter { it.status == PackStatus.DOWNLOADED }
+                .map { it.mlKitCode }
+                .toMutableSet()
+                .apply { addAll(_downloadingPacks.value) }
+            val usedExtraSlotCredit = !isPremium.value &&
+                extraSlotCredits.value.extraSlotCredits > 0 &&
+                !reservedBefore.contains(mlKitCode) &&
+                reservedBefore.size >= freeLanguageLimit
 
             if (!ConnectivityHelper.isOnline(application)) {
                 onMessage(application.getString(R.string.no_internet_connection))
@@ -79,8 +92,11 @@ class LanguagePackController(
                     application.getString(
                         R.string.language_ready_template,
                         lang?.displayName(application) ?: mlKitCode
-                    )
                 )
+                )
+                if (usedExtraSlotCredit) {
+                    onExtraSlotConsumed()
+                }
                 onPackStateChanged()
             } catch (e: CancellationException) {
                 throw e

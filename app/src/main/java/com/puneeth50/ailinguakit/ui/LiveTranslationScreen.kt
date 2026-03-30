@@ -40,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -118,6 +117,7 @@ private fun CameraView(
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+    val overlayColor = MaterialTheme.colorScheme.secondary
     
     var recognizedTextBlocks by remember { mutableStateOf<List<TextBlockInfo>>(emptyList()) }
     var isFlashEnabled by remember { mutableStateOf(false) }
@@ -195,7 +195,7 @@ private fun CameraView(
             recognizedTextBlocks.forEach { block ->
                 block.boundingBox?.let { rect ->
                     drawRect(
-                        color = Color.Cyan,
+                        color = overlayColor,
                         topLeft = Offset(rect.left.toFloat(), rect.top.toFloat()),
                         size = Size(rect.width().toFloat(), rect.height().toFloat()),
                         style = Stroke(width = 2.dp.toPx())
@@ -209,7 +209,7 @@ private fun CameraView(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter),
-            color = Color.Black.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
         ) {
             Row(
                 modifier = Modifier
@@ -219,7 +219,11 @@ private fun CameraView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.close),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 
                 // Language Selection in AR Mode
@@ -227,7 +231,7 @@ private fun CameraView(
                     Text(
                         stringResource(R.string.target_label),
                         style = MaterialTheme.typography.labelMedium, 
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     LanguageDropdown(
                         selected = targetLang,
@@ -246,7 +250,7 @@ private fun CameraView(
                     Icon(
                         if (isFlashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
                         contentDescription = stringResource(R.string.toggle_flash),
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }

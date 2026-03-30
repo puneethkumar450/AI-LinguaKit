@@ -1,5 +1,8 @@
 package com.puneeth50.ailinguakit.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -11,14 +14,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.puneeth50.ailinguakit.R
 import com.puneeth50.ailinguakit.data.PackStatus
 import com.puneeth50.ailinguakit.viewmodel.AppViewModel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 @Composable
 fun MainScreen(vm: AppViewModel = hiltViewModel()) {
@@ -51,6 +62,7 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+        RewardedAdHost(vm = vm)
         if (isFirstRun) {
             if (showOnboarding) {
                 OnboardingFlow(
@@ -72,6 +84,7 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                     ModernTranslateScreen(
                         vm = vm,
                         onNavigateToHistory = { navController.navigate("history") },
+                        onNavigateToRewards = { navController.navigate("rewards") },
                         onNavigateToSettings = { navController.navigate("settings") },
                         onNavigateToSourcePicker = { navController.navigate("source_picker") },
                         onNavigateToTargetPicker = { navController.navigate("target_picker") }
@@ -102,7 +115,8 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                         onBack = { navController.popBackStack() },
                         onOpenLanguageChange = { navController.navigate("language_change") },
                         onOpenLanguagePacks = { navController.navigate("packs") },
-                        onOpenRewards = { navController.navigate("rewards") }
+                        onOpenRewards = { navController.navigate("rewards") },
+                        onOpenPlanSelection = { navController.navigate("plan_selection") }
                     )
                 }
                 composable("rewards") {
@@ -153,4 +167,80 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
             }
         }
     }
+}
+
+@Composable
+private fun RewardedAdHost(vm: AppViewModel) {
+    val context = LocalContext.current
+
+    LaunchedEffect(context) {
+        vm.rewardRequests.collectLatest { rewardType ->
+            val activity = context.findActivity()
+            if (activity == null) {
+                vm.onRewardAdFailed()
+                return@collectLatest
+            }
+
+            val rewardedAd = loadRewardedAd(context)
+            if (rewardedAd == null) {
+                vm.onRewardAdFailed()
+                return@collectLatest
+            }
+
+            val earned = showRewardedAd(activity, rewardedAd)
+            if (earned) {
+                vm.onRewardAdCompleted(rewardType)
+            } else {
+                vm.onRewardAdDismissed()
+            }
+        }
+    }
+}
+
+private suspend fun loadRewardedAd(context: Context): RewardedAd? = suspendCancellableCoroutine { cont ->
+    RewardedAd.load(
+        context,
+        context.getString(R.string.admob_rewarded_unit_id),
+        AdRequest.Builder().build(),
+        object : RewardedAdLoadCallback() {
+            override fun onAdLoaded(rewardedAd: RewardedAd) {
+                if (cont.isActive) {
+                    cont.resume(rewardedAd)
+                }
+            }
+
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                if (cont.isActive) {
+                    cont.resume(null)
+                }
+            }
+        }
+    )
+}
+
+private suspend fun showRewardedAd(activity: Activity, rewardedAd: RewardedAd): Boolean =
+    suspendCancellableCoroutine { cont ->
+        var earnedReward = false
+        rewardedAd.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                if (cont.isActive) {
+                    cont.resume(earnedReward)
+                }
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
+                if (cont.isActive) {
+                    cont.resume(false)
+                }
+            }
+        }
+        rewardedAd.show(activity) {
+            earnedReward = true
+        }
+    }
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

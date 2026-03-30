@@ -30,6 +30,8 @@ import com.puneeth50.ailinguakit.service.BillingRepository
 import com.puneeth50.ailinguakit.service.LanguagePackController
 import com.puneeth50.ailinguakit.service.LanguagePackRepository
 import com.puneeth50.ailinguakit.service.ModelDownloadManager
+import com.puneeth50.ailinguakit.service.RewardType
+import com.puneeth50.ailinguakit.service.RewardsRepository
 import com.puneeth50.ailinguakit.service.SpeechController
 import com.puneeth50.ailinguakit.service.TranslationController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -103,6 +105,7 @@ class AppViewModel @Inject constructor(
     private val packDao: LanguagePackDao,
     private val downloader: ModelDownloadManager,
     private val billingRepo: BillingRepository,
+    private val rewardsRepo: RewardsRepository,
     private val packRepoFactory: LanguagePackRepository.Factory
 ) : AndroidViewModel(application) {
 
@@ -125,6 +128,10 @@ class AppViewModel @Inject constructor(
 
     private val _showInterstitialAd = MutableSharedFlow<Unit>(extraBufferCapacity = 2)
     val showInterstitialAd = _showInterstitialAd.asSharedFlow()
+    val rewardRequests = rewardsRepo.rewardRequests
+    val rewardWallet = rewardsRepo.wallet
+    private val _showWordRewardPrompt = MutableStateFlow(false)
+    val showWordRewardPrompt: StateFlow<Boolean> = _showWordRewardPrompt.asStateFlow()
 
     private val _freeWordsUsed = MutableStateFlow(prefs.getInt(PREF_FREE_WORDS_USED, 0))
     val freeWordsUsed: StateFlow<Int> = _freeWordsUsed.asStateFlow()
@@ -146,6 +153,9 @@ class AppViewModel @Inject constructor(
 
     private val _historySearchQuery = MutableStateFlow("")
     val historySearchQuery: StateFlow<String> = _historySearchQuery.asStateFlow()
+
+    private var pendingRewardedTranslateRetry = false
+    private var pendingRewardedPackDownload: Pair<String, Boolean>? = null
 
     private val speechController = SpeechController(application, ::handleSpeechResult)
     val ttsReady: StateFlow<Boolean> = speechController.ttsReady
@@ -176,6 +186,8 @@ class AppViewModel @Inject constructor(
         isPremium = isPremium,
         scope = viewModelScope,
         freeLanguageLimit = FREE_LANGUAGE_LIMIT,
+        extraSlotCredits = rewardWallet,
+        onExtraSlotConsumed = rewardsRepo::consumeExtraSlotCredit,
         onMessage = { message -> _uiMessage.emit(message) },
         onPackStateChanged = ::reconcileFreeLanguagesWithCurrentState
     )
@@ -264,8 +276,10 @@ class AppViewModel @Inject constructor(
     fun canOpenLanguagePicker(): Boolean = isPremium.value
 
     fun isFreeLanguage(lang: LanguageOption): Boolean {
-        return _freePlanLanguages.value.any { it.code == lang.code }
+        return currentAllowedFreeLanguages().any { it.code == lang.code }
     }
+
+    fun canUseSpeechReward(): Boolean = !isPremium.value && !rewardsRepo.isSpeechUnlockedNow()
 
     fun getSelectableSourceLanguages(): List<LanguageOption> {
         return if (isPremium.value) {
@@ -303,9 +317,13 @@ class AppViewModel @Inject constructor(
 
     fun remainingFreeWords(): Int = (FREE_WORD_LIMIT - _freeWordsUsed.value).coerceAtLeast(0)
 
-    fun shouldShowAds(): Boolean = !isPremium.value
+    fun bonusWordsRemaining(): Int = rewardsRepo.bonusWordsRemaining()
 
-    fun shouldShowBannerAd(): Boolean = !isPremium.value
+    fun availableDownloadSlots(): Int = currentFreeLanguageLimit()
+
+    fun shouldShowAds(): Boolean = !isPremium.value && !rewardsRepo.isAdFreeNow()
+
+    fun shouldShowBannerAd(): Boolean = !isPremium.value && !rewardsRepo.isAdFreeNow()
 
     fun canDownloadPack(mlKitCode: String): Boolean {
         return packController.canDownloadPack(mlKitCode)
@@ -316,6 +334,7 @@ class AppViewModel @Inject constructor(
     }
 
     fun onTranslateInputChange(text: String) {
+        _showWordRewardPrompt.value = false
         translationController.onTranslateInputChange(text)
     }
 
@@ -332,6 +351,7 @@ class AppViewModel @Inject constructor(
     }
 
     fun translate() {
+        _showWordRewardPrompt.value = false
         translationController.translate(::buildOfflineError)
     }
 
@@ -340,9 +360,9 @@ class AppViewModel @Inject constructor(
     }
 
     fun startRecording() {
-        if (!isPremium.value) {
+        if (!isPremium.value && !rewardsRepo.isSpeechUnlockedNow()) {
             viewModelScope.launch {
-                _uiMessage.emit(appString(R.string.speech_input_premium_only))
+                _uiMessage.emit(appString(R.string.speech_unlock_reward_message))
             }
             return
         }
@@ -357,12 +377,91 @@ class AppViewModel @Inject constructor(
     }
 
     fun clearTranslation() {
+        _showWordRewardPrompt.value = false
         translationController.clearTranslation()
         stopSpeaking()
     }
 
     fun downloadPack(mlKitCode: String, requireWifi: Boolean = true) {
         packController.downloadPack(mlKitCode, requireWifi)
+    }
+
+    fun requestPackSlotRewardAndDownload(mlKitCode: String, requireWifi: Boolean) {
+        if (rewardsRepo.hasUnusedExtraSlotCredit()) {
+            downloadPack(mlKitCode, requireWifi)
+            return
+        }
+        pendingRewardedPackDownload = mlKitCode to requireWifi
+        rewardsRepo.requestReward(RewardType.EXTRA_SLOT)
+    }
+
+    fun requestWordRewardAndRetry() {
+        if (rewardsRepo.hasUnusedBonusWords()) {
+            viewModelScope.launch {
+                _uiMessage.emit(appString(R.string.reward_use_existing_words_first))
+            }
+            return
+        }
+        pendingRewardedTranslateRetry = true
+        _showWordRewardPrompt.value = false
+        rewardsRepo.requestReward(RewardType.EXTRA_WORDS)
+    }
+
+    fun requestSpeechRewardAndRecord() {
+        rewardsRepo.requestReward(RewardType.SPEECH_SESSION)
+    }
+
+    fun requestReward(type: RewardType) {
+        rewardsRepo.requestReward(type)
+    }
+
+    fun dismissWordRewardPrompt() {
+        _showWordRewardPrompt.value = false
+    }
+
+    fun onRewardAdCompleted(type: RewardType) {
+        rewardsRepo.grantReward(type)
+        when (type) {
+            RewardType.EXTRA_WORDS -> {
+                viewModelScope.launch {
+                    _uiMessage.emit(appString(R.string.reward_words_earned_template, rewardsRepo.bonusWordsRemaining()))
+                }
+                if (pendingRewardedTranslateRetry) {
+                    pendingRewardedTranslateRetry = false
+                    translate()
+                }
+            }
+            RewardType.EXTRA_SLOT -> {
+                viewModelScope.launch {
+                    _uiMessage.emit(appString(R.string.reward_slot_earned))
+                }
+                pendingRewardedPackDownload?.let { (code, wifiOnly) ->
+                    pendingRewardedPackDownload = null
+                    downloadPack(code, wifiOnly)
+                }
+            }
+            RewardType.SPEECH_SESSION -> {
+                viewModelScope.launch {
+                    _uiMessage.emit(appString(R.string.reward_speech_earned))
+                }
+            }
+            RewardType.AD_FREE -> {
+                viewModelScope.launch {
+                    _uiMessage.emit(appString(R.string.reward_ad_free_earned))
+                }
+            }
+        }
+    }
+
+    fun onRewardAdFailed() {
+        clearPendingRewardActions()
+        viewModelScope.launch {
+            _uiMessage.emit(appString(R.string.reward_ad_not_ready))
+        }
+    }
+
+    fun onRewardAdDismissed() {
+        clearPendingRewardActions()
     }
 
     fun cancelPackDownload(mlKitCode: String) {
@@ -549,8 +648,17 @@ class AppViewModel @Inject constructor(
         val counted = prefs.getStringSet(PREF_COUNTED_TRANSLATION_KEYS, emptySet()).orEmpty().toMutableSet()
         if (counted.contains(key)) return
 
+        val words = countWords(text)
+        val freeRemaining = (FREE_WORD_LIMIT - _freeWordsUsed.value).coerceAtLeast(0)
+        val freePortion = words.coerceAtMost(freeRemaining)
+        val rewardPortion = (words - freePortion).coerceAtLeast(0)
+
+        if (rewardPortion > 0) {
+            rewardsRepo.consumeBonusWords(rewardPortion)
+        }
+
         counted.add(key)
-        val newTotal = _freeWordsUsed.value + countWords(text)
+        val newTotal = (_freeWordsUsed.value + freePortion).coerceAtMost(FREE_WORD_LIMIT)
         prefs.edit()
             .putInt(PREF_FREE_WORDS_USED, newTotal)
             .putStringSet(PREF_COUNTED_TRANSLATION_KEYS, counted)
@@ -563,8 +671,14 @@ class AppViewModel @Inject constructor(
         val counted = prefs.getStringSet(PREF_COUNTED_TRANSLATION_KEYS, emptySet()).orEmpty()
         if (counted.contains(key)) return
 
-        val prospectiveTotal = _freeWordsUsed.value + countWords(text)
-        if (prospectiveTotal > FREE_WORD_LIMIT) {
+        val wordsNeeded = countWords(text)
+        val freeRemaining = (FREE_WORD_LIMIT - _freeWordsUsed.value).coerceAtLeast(0)
+        val rewardRemaining = rewardsRepo.bonusWordsRemaining()
+        if (freeRemaining + rewardRemaining < wordsNeeded) {
+            if (rewardRemaining > 0) {
+                throw IllegalStateException(appString(R.string.reward_use_existing_words_first))
+            }
+            _showWordRewardPrompt.value = true
             throw IllegalStateException(appString(R.string.free_plan_limit_upgrade_unlimited))
         }
     }
@@ -580,7 +694,7 @@ class AppViewModel @Inject constructor(
         val nextValue = _translateActions.value + 1
         prefs.edit { putInt(PREF_TRANSLATE_ACTIONS, nextValue) }
         _translateActions.value = nextValue
-        if (!isPremium.value && nextValue % AD_FREQUENCY == 0) {
+        if (!isPremium.value && !rewardsRepo.isAdFreeNow() && nextValue % AD_FREQUENCY == 0) {
             _showInterstitialAd.emit(Unit)
         }
     }
@@ -610,13 +724,14 @@ class AppViewModel @Inject constructor(
             .distinctBy { it.code }
 
         val persisted = loadPersistedFreeLanguages()
+        val languageLimit = currentFreeLanguageLimit()
         val chosen = when {
-            downloaded.size >= FREE_LANGUAGE_LIMIT -> downloaded.take(FREE_LANGUAGE_LIMIT)
-            persisted.isNotEmpty() -> persisted.take(FREE_LANGUAGE_LIMIT)
-            else -> listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(FREE_LANGUAGE_LIMIT - 1)
+            downloaded.size >= languageLimit -> downloaded.take(languageLimit)
+            persisted.isNotEmpty() -> persisted.take(languageLimit)
+            else -> listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(languageLimit - 1)
         }
 
-        persistFreeLanguages(chosen)
+        persistFreeLanguages(chosen, languageLimit)
         if (chosen.isNotEmpty()) {
             translationController.coerceSelectedLanguages(
                 sourceFallback = chosen.first(),
@@ -625,8 +740,8 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    private fun persistFreeLanguages(languages: List<LanguageOption>) {
-        val codes = languages.distinctBy { it.code }.take(FREE_LANGUAGE_LIMIT).map { it.code }
+    private fun persistFreeLanguages(languages: List<LanguageOption>, limit: Int = FREE_LANGUAGE_LIMIT) {
+        val codes = languages.distinctBy { it.code }.take(limit).map { it.code }
         prefs.edit {
             putStringSet(PREF_FREE_LANGUAGE_CODES, codes.toSet())
             putString(PREF_FREE_LANGUAGE_CODES_ORDERED, codes.joinToString(","))
@@ -634,7 +749,7 @@ class AppViewModel @Inject constructor(
         _freePlanLanguages.value = codes.mapNotNull { code ->
             SUPPORTED_LANGUAGES.find { it.code == code }
         }.ifEmpty {
-            listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(FREE_LANGUAGE_LIMIT - 1)
+            listOf(DEFAULT_FREE_LANGUAGE) + SUPPORTED_LANGUAGES.filter { it.code != DEFAULT_FREE_LANGUAGE.code }.take(limit - 1)
         }
     }
 
@@ -711,8 +826,18 @@ class AppViewModel @Inject constructor(
             .filter { it.status == PackStatus.DOWNLOADED }
             .mapNotNull { pack -> SUPPORTED_LANGUAGES.find { it.mlKitCode == pack.mlKitCode } }
             .distinctBy { it.code }
-            .take(FREE_LANGUAGE_LIMIT)
+            .take(currentFreeLanguageLimit())
         return downloaded.ifEmpty { _freePlanLanguages.value }
+    }
+
+    private fun currentFreeLanguageLimit(): Int {
+        val downloadedCount = allPacks.value.count { it.status == PackStatus.DOWNLOADED }
+        return maxOf(FREE_LANGUAGE_LIMIT + rewardsRepo.extraSlotCredits(), downloadedCount)
+    }
+
+    private fun clearPendingRewardActions() {
+        pendingRewardedTranslateRetry = false
+        pendingRewardedPackDownload = null
     }
 
     private fun appString(@StringRes resId: Int, vararg args: Any): String {
