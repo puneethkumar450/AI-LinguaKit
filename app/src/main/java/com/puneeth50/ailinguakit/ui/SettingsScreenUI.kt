@@ -104,10 +104,12 @@ fun SettingsScreenUI(
             }
 
             item {
-                Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors().copy(
+                Card(shape = RoundedCornerShape(18.dp),
+                   /* colors = CardDefaults.cardColors().copy(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )) {
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer)*/
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    )) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             stringResource(R.string.theme_mode_title),
@@ -448,10 +450,11 @@ private fun SettingsActionCard(
     onClick: () -> Unit
 ) {
     Card(shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors().copy(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        /*colors = CardDefaults.cardColors().copy(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor  = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
+        ),*/
         modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier

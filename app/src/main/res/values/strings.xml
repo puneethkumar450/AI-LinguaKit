@@ -70,6 +70,9 @@
     <string name="plan_lifetime_choice_trailing">No renewal</string>
     <string name="plan_active_label">Active</string>
     <string name="plan_unavailable">Not available right now</string>
+    <string name="plan_unavailable_cta">Plan unavailable</string>
+    <string name="plan_unavailable_footer">This plan is not available on this device right now. Try a Play Store test build or check your Play Console setup.</string>
+    <string name="plan_no_products_loaded">Premium plans have not loaded on this device yet.</string>
     <string name="plan_free_choice_title">Free</string>
     <string name="plan_free_choice_subtitle">3 offline packs • 3,000 words</string>
     <string name="plan_free_choice_trailing">Basic access</string>
@@ -305,6 +308,8 @@
     <string name="rewards_settings_speech_template">Rewards: speech unlocked for %1$d min</string>
     <string name="rewards_settings_ad_free_template">Rewards: ad-free for %1$d min</string>
     <string name="offline_packs_not_ready_template">You\'re offline and the %1$s to %2$s packs are not ready.</string>
+
+
     <string name="auto_detect">Auto Detect</string>
     <string name="auto_detect_with_language">Auto (%1$s)</string>
     <string name="system_default">System default</string>

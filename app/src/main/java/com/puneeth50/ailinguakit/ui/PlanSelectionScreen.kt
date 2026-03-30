@@ -46,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -59,6 +58,7 @@ import com.puneeth50.ailinguakit.service.PremiumPlanOption
 import com.puneeth50.ailinguakit.service.PremiumPlanType
 import com.puneeth50.ailinguakit.ui.theme.AccentGold
 import com.puneeth50.ailinguakit.ui.theme.BrandBlue
+import com.puneeth50.ailinguakit.ui.theme.highlightCardBrush
 import com.puneeth50.ailinguakit.viewmodel.AppViewModel
 
 private enum class SelectedPlan {
@@ -113,9 +113,7 @@ fun PlanSelectionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(backgroundTop, backgroundMid, backgroundBottom)
-                    )
+                    highlightCardBrush()
                 )
         ) {
             Column(
@@ -241,6 +239,16 @@ fun PlanSelectionScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
+                if (billingReady && availablePlans.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.plan_no_products_loaded),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+
                 PlanOptionCard(
                     title = stringResource(R.string.plan_yearly_choice_title),
                     subtitle = yearlyPlan?.let {
@@ -248,11 +256,13 @@ fun PlanSelectionScreen(
                     } ?: stringResource(R.string.plan_unavailable),
                     trailing = when {
                         isPremium && activePlanType == PremiumPlanType.YEARLY -> stringResource(R.string.plan_active_label)
+                        yearlyPlan == null -> stringResource(R.string.plan_unavailable)
                         else -> stringResource(R.string.plan_yearly_choice_trailing)
                     },
                     badge = stringResource(R.string.plan_most_popular),
                     selected = (isPremium && activePlanType == PremiumPlanType.YEARLY) || (!isPremium && selectedPlan == SelectedPlan.YEARLY),
-                    enabled = yearlyPlan != null && !isPremium,
+                    available = yearlyPlan != null,
+                    enabled = !isPremium,
                     containerColor = optionSurface,
                     borderColor = if ((isPremium && activePlanType == PremiumPlanType.YEARLY) || (!isPremium && selectedPlan == SelectedPlan.YEARLY)) {
                         highlightBorder
@@ -273,11 +283,13 @@ fun PlanSelectionScreen(
                     } ?: stringResource(R.string.plan_unavailable),
                     trailing = when {
                         isPremium && activePlanType == PremiumPlanType.MONTHLY -> stringResource(R.string.plan_active_label)
+                        monthlyPlan == null -> stringResource(R.string.plan_unavailable)
                         else -> stringResource(R.string.plan_monthly_choice_trailing)
                     },
                     badge = null,
                     selected = (isPremium && activePlanType == PremiumPlanType.MONTHLY) || (!isPremium && selectedPlan == SelectedPlan.MONTHLY),
-                    enabled = monthlyPlan != null && !isPremium,
+                    available = monthlyPlan != null,
+                    enabled = !isPremium,
                     containerColor = optionSurface,
                     borderColor = if ((isPremium && activePlanType == PremiumPlanType.MONTHLY) || (!isPremium && selectedPlan == SelectedPlan.MONTHLY)) {
                         highlightBorder
@@ -298,11 +310,13 @@ fun PlanSelectionScreen(
                     } ?: stringResource(R.string.plan_unavailable),
                     trailing = when {
                         isPremium && activePlanType == PremiumPlanType.LIFETIME -> stringResource(R.string.plan_active_label)
+                        lifetimePlan == null -> stringResource(R.string.plan_unavailable)
                         else -> stringResource(R.string.plan_lifetime_choice_trailing)
                     },
                     badge = null,
                     selected = (isPremium && activePlanType == PremiumPlanType.LIFETIME) || (!isPremium && selectedPlan == SelectedPlan.LIFETIME),
-                    enabled = lifetimePlan != null && !isPremium,
+                    available = lifetimePlan != null,
+                    enabled = !isPremium,
                     containerColor = optionSurface,
                     borderColor = if ((isPremium && activePlanType == PremiumPlanType.LIFETIME) || (!isPremium && selectedPlan == SelectedPlan.LIFETIME)) {
                         highlightBorder
@@ -322,6 +336,7 @@ fun PlanSelectionScreen(
                     trailing = stringResource(R.string.plan_free_choice_trailing),
                     badge = null,
                     selected = !isPremium && selectedPlan == SelectedPlan.FREE,
+                    available = true,
                     enabled = !isPremium,
                     containerColor = optionSurface,
                     borderColor = if (!isPremium && selectedPlan == SelectedPlan.FREE) {
@@ -355,6 +370,8 @@ fun PlanSelectionScreen(
                                 isPremium && activePlanType == PremiumPlanType.LIFETIME ->
                                     stringResource(R.string.plan_footer_lifetime)
                                 isPremium -> stringResource(R.string.plan_footer_premium)
+                                selectedPlan != SelectedPlan.FREE && selectedPremiumPlan == null ->
+                                    stringResource(R.string.plan_unavailable_footer)
                                 selectedPlan == SelectedPlan.YEARLY ->
                                     stringResource(R.string.plan_footer_yearly)
                                 selectedPlan == SelectedPlan.MONTHLY ->
@@ -398,6 +415,8 @@ fun PlanSelectionScreen(
                             Text(
                                 text = when {
                                     isPremium -> stringResource(R.string.premium_active)
+                                    selectedPlan != SelectedPlan.FREE && selectedPremiumPlan == null ->
+                                        stringResource(R.string.plan_unavailable_cta)
                                     selectedPlan == SelectedPlan.YEARLY -> stringResource(R.string.plan_start_yearly)
                                     selectedPlan == SelectedPlan.MONTHLY -> stringResource(R.string.plan_start_monthly)
                                     selectedPlan == SelectedPlan.LIFETIME -> stringResource(R.string.plan_start_lifetime)
@@ -485,6 +504,7 @@ private fun PlanOptionCard(
     trailing: String,
     badge: String?,
     selected: Boolean,
+    available: Boolean,
     enabled: Boolean,
     containerColor: Color,
     borderColor: Color,
@@ -492,33 +512,21 @@ private fun PlanOptionCard(
     accentColor: Color,
     onClick: () -> Unit
 ) {
-    val contentAlpha = if (enabled || selected) 1f else 0.55f
+    val contentAlpha = when {
+        selected -> 1f
+        available -> 0.96f
+        else -> 0.72f
+    }
 
     Box {
-        if (badge != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(AccentGold)
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = badge,
-                    color = BrandBlue,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-        }
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = if (badge != null) 20.dp else 0.dp)
                 .clickable(enabled = enabled, onClick = onClick),
             shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = contentAlpha)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor.copy(alpha = contentAlpha))
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f)),
+            border = androidx.compose.foundation.BorderStroke(2.dp, borderColor.copy(alpha = contentAlpha))
         ) {
             Row(
                 modifier = Modifier
@@ -569,6 +577,22 @@ private fun PlanOptionCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.End
+                )
+            }
+        }
+
+        if (badge != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(AccentGold)
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = badge,
+                    color = BrandBlue,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
