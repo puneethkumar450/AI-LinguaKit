@@ -2,7 +2,9 @@ package com.puneeth50.ailinguakit.ui
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.ContextWrapper
+import android.net.Uri
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -34,6 +36,7 @@ import kotlin.coroutines.resume
 
 @Composable
 fun MainScreen(vm: AppViewModel = hiltViewModel()) {
+    val context = LocalContext.current
     val isFirstRun by vm.isFirstRun.collectAsState()
     val allPacks by vm.allPacks.collectAsState()
     val sourceLang by vm.translateSourceLang.collectAsState()
@@ -117,7 +120,8 @@ fun MainScreen(vm: AppViewModel = hiltViewModel()) {
                         onOpenLanguageChange = { navController.navigate("language_change") },
                         onOpenLanguagePacks = { navController.navigate("packs") },
                         onOpenRewards = { navController.navigate("rewards") },
-                        onOpenPlanSelection = { navController.navigate("plan_selection") }
+                        onOpenPlanSelection = { navController.navigate("plan_selection") },
+                        onOpenPrivacyPolicy = { context.openPrivacyPolicy() }
                     )
                 }
                 composable("rewards") {
@@ -244,4 +248,12 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+private fun Context.openPrivacyPolicy() {
+    startActivity(
+        Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.PRIVACY_POLICY_URL)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    )
 }

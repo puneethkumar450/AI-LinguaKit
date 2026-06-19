@@ -16,6 +16,8 @@
     <string name="continue_in_seconds">Continue in %1$ds</string>
     <string name="enter_text_placeholder">Translate text</string>
     <string name="settings_title">Settings</string>
+    <string name="privacy_policy_title">Privacy policy</string>
+    <string name="privacy_policy_subtitle">See how %1$s handles language data, ads, and purchases.</string>
     <string name="language_change_title">Change app language</string>
     <string name="choose_two_languages">Choose 2 Languages</string>
     <string name="selected_count_template">%1$d/2</string>

@@ -60,7 +60,8 @@ fun SettingsScreenUI(
     onOpenLanguageChange: () -> Unit,
     onOpenLanguagePacks: () -> Unit,
     onOpenRewards: () -> Unit,
-    onOpenPlanSelection: () -> Unit
+    onOpenPlanSelection: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit
 ) {
     val themeMode by vm.themeMode.collectAsState()
     val isPremium by vm.isPremium.collectAsState()
@@ -156,6 +157,14 @@ fun SettingsScreenUI(
                     title = stringResource(R.string.rewards_title),
                     subtitle = rewardsSubtitle,
                     onClick = onOpenRewards
+                )
+            }
+
+            item {
+                SettingsActionCard(
+                    title = stringResource(R.string.privacy_policy_title),
+                    subtitle = stringResource(R.string.privacy_policy_subtitle, stringResource(R.string.app_name)),
+                    onClick = onOpenPrivacyPolicy
                 )
             }
         }

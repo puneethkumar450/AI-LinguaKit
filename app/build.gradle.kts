@@ -68,6 +68,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "PRIVACY_POLICY_URL",
+            escapedBuildConfigString("https://puneethkumar450.github.io/AI-LinguaKit/privacy-policy/")
+        )
 
     }
 
