@@ -31,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.puneeth50.ailinguakit.BuildConfig
 import com.puneeth50.ailinguakit.R
 import kotlinx.coroutines.delay
 
@@ -105,7 +106,7 @@ fun AdBannerCard() {
                         ViewGroup.LayoutParams.WRAP_CONTENT
                     )
                     setAdSize(AdSize.BANNER)
-                    adUnitId = context.getString(R.string.admob_banner_unit_id)
+                    adUnitId = BuildConfig.ADMOB_BANNER_UNIT_ID
                     loadAd(AdRequest.Builder().build())
                 }
             }

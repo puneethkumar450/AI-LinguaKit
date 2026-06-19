@@ -19,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.puneeth50.ailinguakit.BuildConfig
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
@@ -200,7 +201,7 @@ private fun RewardedAdHost(vm: AppViewModel) {
 private suspend fun loadRewardedAd(context: Context): RewardedAd? = suspendCancellableCoroutine { cont ->
     RewardedAd.load(
         context,
-        context.getString(R.string.admob_rewarded_unit_id),
+        BuildConfig.ADMOB_REWARDED_UNIT_ID,
         AdRequest.Builder().build(),
         object : RewardedAdLoadCallback() {
             override fun onAdLoaded(rewardedAd: RewardedAd) {
